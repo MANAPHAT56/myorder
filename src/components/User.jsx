@@ -35,19 +35,124 @@ const authHeaders = () => {
 // ============================================================
 const MOCK_USER = { id: "USR0042", name: "ปิยะ ใจดี", email: "piya@gmail.com", avatar: null };
 
-const MOCK_SHOPS = [
-  { id: 1, name: "ร้านข้าวมันไก่สมชาย", category: "อาหาร", tier: 3, link: "https://line.me/shop1", description: "ข้าวมันไก่ต้มและทอด สูตรโบราณ รสชาติเข้มข้น เปิดมากว่า 20 ปี", rating: 4.8, reviews: 312, verified: true, location: "สุขุมวิท 11, กรุงเทพฯ", img_emoji: "🍗", tags: ["ข้าว", "ไก่", "อาหารจานเดียว"] },
-  { id: 2, name: "ก๋วยเตี๋ยวเรือป้าแดง", category: "อาหาร", tier: 2, link: "https://line.me/shop2", description: "ก๋วยเตี๋ยวเรือสูตรดั้งเดิม น้ำซุปเข้มข้น หมูนุ่มลูกชิ้นเด้ง", rating: 4.6, reviews: 187, verified: true, location: "รามคำแหง 24, กรุงเทพฯ", img_emoji: "🍜", tags: ["ก๋วยเตี๋ยว", "หมู", "เรือ"] },
-  { id: 3, name: "ขนมครกบ้านนา", category: "ขนม", tier: 1, link: "https://line.me/shop3", description: "ขนมครกหอมมะพร้าว ใส่ต้นหอมหน้าขาว ทำสดทุกวัน", rating: 4.3, reviews: 94, verified: false, location: "ลาดพร้าว 41, กรุงเทพฯ", img_emoji: "🥥", tags: ["ขนม", "มะพร้าว", "ของหวาน"] },
-  { id: 4, name: "ส้มตำอีสานแม่ตุ๋ย", category: "อาหาร", tier: 2, link: "https://line.me/shop4", description: "ส้มตำ ลาบ ก้อยรสเด็ด แซ่บอีหลี ข้าวเหนียวหุงใหม่ทุกวัน", rating: 4.7, reviews: 256, verified: true, location: "พระโขนง, กรุงเทพฯ", img_emoji: "🥗", tags: ["ส้มตำ", "อีสาน", "แซ่บ"] },
-  { id: 5, name: "ชานมไข่มุกไต้หวันแท้", category: "เครื่องดื่ม", tier: 3, link: "https://line.me/shop5", description: "ชานมไข่มุกไต้หวันแบบดั้งเดิม ไข่มุกทำเอง หวานน้อยได้", rating: 4.9, reviews: 523, verified: true, location: "ทองหล่อ, กรุงเทพฯ", img_emoji: "🧋", tags: ["ชานม", "ไข่มุก", "เครื่องดื่ม"] },
-  { id: 6, name: "ปาท่องโก๋กรอบน้อย", category: "ขนม", tier: 1, link: "https://line.me/shop6", description: "ปาท่องโก๋ทอดสด กรอบนอกนุ่มใน เสิร์ฟคู่นมถั่วเหลืองร้อนๆ", rating: 4.2, reviews: 67, verified: false, location: "อ่อนนุช, กรุงเทพฯ", img_emoji: "🍩", tags: ["ปาท่องโก๋", "ของเช้า", "ทอด"] },
+const MOCK_SHOPS_ALL = [
+  { id: 1,  name: "ร้านข้าวมันไก่สมชาย",      category: "อาหาร",      tier: 3, entity_type: "individual", link: "https://line.me/shop1",  description: "ข้าวมันไก่ต้มและทอด สูตรโบราณ รสชาติเข้มข้น เปิดมากว่า 20 ปี",              rating: 4.8, reviews: 312, verified: true,  location: "สุขุมวิท 11, กรุงเทพฯ",  is_closed: false, is_blacklisted: false, img_emoji: "🍗", tags: ["ข้าว","ไก่","อาหารจานเดียว"] },
+  { id: 2,  name: "ก๋วยเตี๋ยวเรือป้าแดง",      category: "อาหาร",      tier: 2, entity_type: "company",    link: "https://line.me/shop2",  description: "ก๋วยเตี๋ยวเรือสูตรดั้งเดิม น้ำซุปเข้มข้น หมูนุ่มลูกชิ้นเด้ง",             rating: 4.6, reviews: 187, verified: true,  location: "รามคำแหง 24, กรุงเทพฯ",  is_closed: false, is_blacklisted: false, img_emoji: "🍜", tags: ["ก๋วยเตี๋ยว","หมู","เรือ"] },
+  { id: 3,  name: "ขนมครกบ้านนา",              category: "ขนม",        tier: 1, entity_type: "individual", link: "https://line.me/shop3",  description: "ขนมครกหอมมะพร้าว ใส่ต้นหอมหน้าขาว ทำสดทุกวัน",                           rating: 4.3, reviews: 94,  verified: false, location: "ลาดพร้าว 41, กรุงเทพฯ",  is_closed: false, is_blacklisted: false, img_emoji: "🥥", tags: ["ขนม","มะพร้าว","ของหวาน"] },
+  { id: 4,  name: "ส้มตำอีสานแม่ตุ๋ย",        category: "อาหาร",      tier: 2, entity_type: "individual", link: "https://line.me/shop4",  description: "ส้มตำ ลาบ ก้อยรสเด็ด แซ่บอีหลี ข้าวเหนียวหุงใหม่ทุกวัน",              rating: 4.7, reviews: 256, verified: true,  location: "พระโขนง, กรุงเทพฯ",      is_closed: false, is_blacklisted: false, img_emoji: "🥗", tags: ["ส้มตำ","อีสาน","แซ่บ"] },
+  { id: 5,  name: "ชานมไข่มุกไต้หวันแท้",     category: "เครื่องดื่ม", tier: 3, entity_type: "company",   link: "https://line.me/shop5",  description: "ชานมไข่มุกไต้หวันแบบดั้งเดิม ไข่มุกทำเอง หวานน้อยได้",                  rating: 4.9, reviews: 523, verified: true,  location: "ทองหล่อ, กรุงเทพฯ",      is_closed: false, is_blacklisted: false, img_emoji: "🧋", tags: ["ชานม","ไข่มุก","เครื่องดื่ม"] },
+  { id: 6,  name: "ปาท่องโก๋กรอบน้อย",        category: "ขนม",        tier: 1, entity_type: "individual", link: "https://line.me/shop6",  description: "ปาท่องโก๋ทอดสด กรอบนอกนุ่มใน เสิร์ฟคู่นมถั่วเหลืองร้อนๆ",             rating: 4.2, reviews: 67,  verified: false, location: "อ่อนนุช, กรุงเทพฯ",       is_closed: false, is_blacklisted: false, img_emoji: "🍩", tags: ["ปาท่องโก๋","ของเช้า","ทอด"] },
+  { id: 7,  name: "ร้านหมูกระทะแซ่บโอ้โห",    category: "อาหาร",      tier: 2, entity_type: "company",    link: "https://line.me/shop7",  description: "หมูกระทะบุฟเฟ่ต์ไม่อั้น เนื้อสดใหม่ทุกวัน น้ำจิ้มสูตรพิเศษ",          rating: 4.5, reviews: 445, verified: true,  location: "บางนา, กรุงเทพฯ",        is_closed: false, is_blacklisted: false, img_emoji: "🥩", tags: ["หมูกระทะ","บุฟเฟ่ต์","เนื้อ"] },
+  { id: 8,  name: "กาแฟดริปคั่วสด",            category: "เครื่องดื่ม", tier: 2, entity_type: "individual", link: "https://line.me/shop8", description: "กาแฟดริปจากเมล็ดคั่วสด ออร์เดอร์ได้ทุกสายพันธุ์ ส่งทั่วไทย",              rating: 4.7, reviews: 198, verified: true,  location: "เชียงใหม่",               is_closed: false, is_blacklisted: false, img_emoji: "☕", tags: ["กาแฟ","ดริป","คั่วสด"] },
+  { id: 9,  name: "ขนมไทยโบราณแม่สมศรี",      category: "ขนม",        tier: 1, entity_type: "individual", link: "https://line.me/shop9",  description: "ขนมไทยโบราณ ทองหยิบ ฝอยทอง มัสหมั่น ทำสั่งได้ล่วงหน้า",              rating: 4.4, reviews: 112, verified: false, location: "นนทบุรี",                 is_closed: false, is_blacklisted: false, img_emoji: "🍮", tags: ["ขนมไทย","โบราณ","สั่งทำ"] },
+  { id: 10, name: "น้ำผลไม้ปั่นสดคุณวิไล",    category: "เครื่องดื่ม", tier: 1, entity_type: "individual", link: "https://line.me/shop10", description: "น้ำผลไม้ปั่นสด ไม่ผสมน้ำตาล 100% ผลไม้แท้ มีเดลิเวอรี่",              rating: 4.1, reviews: 43,  verified: false, location: "มีนบุรี, กรุงเทพฯ",       is_closed: false, is_blacklisted: false, img_emoji: "🍹", tags: ["น้ำผลไม้","สด","สุขภาพ"] },
+  { id: 11, name: "ข้าวหน้าเป็ดพะโล้",         category: "อาหาร",      tier: 3, entity_type: "company",    link: "https://line.me/shop11", description: "ข้าวหน้าเป็ดพะโล้ เนื้อนุ่มหอมเครื่องเทศ สูตรต้นตำรับจีนแท้",         rating: 4.8, reviews: 389, verified: true,  location: "เยาวราช, กรุงเทพฯ",      is_closed: false, is_blacklisted: false, img_emoji: "🦆", tags: ["เป็ด","พะโล้","จีน"] },
+  { id: 12, name: "คุกกี้อบสดออเดอร์เมด",      category: "ขนม",        tier: 2, entity_type: "individual", link: "https://line.me/shop12", description: "คุกกี้อบสดสั่งทำได้ ทุกรสชาติ ใส่กล่องของขวัญสวยงาม",               rating: 4.6, reviews: 231, verified: true,  location: "ปทุมธานี",                is_closed: false, is_blacklisted: false, img_emoji: "🍪", tags: ["คุกกี้","อบสด","ของขวัญ"] },
+  { id: 13, name: "ลาบหมูดิบสายเหนือ",         category: "อาหาร",      tier: 1, entity_type: "individual", link: "https://line.me/shop13", description: "ลาบคั่วสไตล์เหนือ แซ่บ หอม กินกับข้าวเหนียวร้อนๆ",                   rating: 4.3, reviews: 78,  verified: false, location: "เชียงราย",                is_closed: false, is_blacklisted: false, img_emoji: "🌿", tags: ["ลาบ","เหนือ","แซ่บ"] },
+  { id: 14, name: "ชาไทยนมสดสูตรต้นตำรับ",    category: "เครื่องดื่ม", tier: 2, entity_type: "company",   link: "https://line.me/shop14", description: "ชาไทยนมสด สูตรต้นตำรับ ชานมเย็นสีส้มสวย รสชาติเข้มข้น",              rating: 4.5, reviews: 167, verified: true,  location: "สีลม, กรุงเทพฯ",         is_closed: false, is_blacklisted: false, img_emoji: "🧡", tags: ["ชาไทย","นมสด","เย็น"] },
+  { id: 15, name: "เค้กวันเกิดสั่งทำพิเศษ",   category: "ขนม",        tier: 3, entity_type: "company",    link: "https://line.me/shop15", description: "เค้กวันเกิด Custom ทุกรูปแบบ รับออเดอร์ล่วงหน้า ส่งทั่วกรุงเทพ",     rating: 4.9, reviews: 602, verified: true,  location: "จตุจักร, กรุงเทพฯ",      is_closed: false, is_blacklisted: false, img_emoji: "🎂", tags: ["เค้ก","วันเกิด","สั่งทำ"] },
+  { id: 16, name: "ผัดซีอิ๊วหมูกรอบ",          category: "อาหาร",      tier: 1, entity_type: "individual", link: "https://line.me/shop16", description: "ผัดซีอิ๊วหมูกรอบ เส้นใหญ่ หมูกรอบทอดเอง ไข่ดาวสด",                 rating: 4.0, reviews: 34,  verified: false, location: "ดอนเมือง, กรุงเทพฯ",     is_closed: false, is_blacklisted: false, img_emoji: "🍱", tags: ["ผัดซีอิ๊ว","หมูกรอบ","เส้นใหญ่"] },
+  { id: 17, name: "โยเกิร์ตผลไม้สดปั่น",       category: "เครื่องดื่ม", tier: 1, entity_type: "individual", link: "https://line.me/shop17", description: "โยเกิร์ตผลไม้สดปั่น เพื่อสุขภาพ ไม่มีน้ำตาลเพิ่ม มีเดลิเวอรี่",   rating: 4.2, reviews: 55,  verified: false, location: "ลาดกระบัง, กรุงเทพฯ",    is_closed: false, is_blacklisted: false, img_emoji: "🫐", tags: ["โยเกิร์ต","ผลไม้","สุขภาพ"] },
+  { id: 18, name: "ข้าวต้มปลาสดเช้าตรู่",      category: "อาหาร",      tier: 2, entity_type: "individual", link: "https://line.me/shop18", description: "ข้าวต้มปลาสด เปิดตี 4 ถึงสาย ปลาสดจากตลาด น้ำซุปใสหอม",             rating: 4.4, reviews: 143, verified: true,  location: "สาทร, กรุงเทพฯ",         is_closed: false, is_blacklisted: false, img_emoji: "🐟", tags: ["ข้าวต้ม","ปลา","เช้า"] },
+  { id: 19, name: "มะม่วงน้ำปลาหวานสูตรเด็ด",  category: "ขนม",        tier: 1, entity_type: "individual", link: "https://line.me/shop19", description: "มะม่วงดิบน้ำปลาหวาน กินกับกะปิรสเด็ด ส่งแบบสดวันต่อวัน",            rating: 4.1, reviews: 29,  verified: false, location: "นครปฐม",                 is_closed: false, is_blacklisted: false, img_emoji: "🥭", tags: ["มะม่วง","น้ำปลาหวาน","ผลไม้"] },
+  { id: 20, name: "ร้านแกงกะหรี่ญี่ปุ่นแท้",  category: "อาหาร",      tier: 3, entity_type: "company",    link: "https://line.me/shop20", description: "แกงกะหรี่ญี่ปุ่นสไตล์บ้านเรา เนื้อนุ่ม น้ำแกงข้น กินกับข้าวญี่ปุ่น", rating: 4.7, reviews: 278, verified: true,  location: "อารีย์, กรุงเทพฯ",       is_closed: false, is_blacklisted: false, img_emoji: "🍛", tags: ["แกงกะหรี่","ญี่ปุ่น","เนื้อ"] },
+  { id: 21, name: "น้ำเต้าหู้ร้อนๆ เช้าเช้า",  category: "เครื่องดื่ม", tier: 1, entity_type: "individual", link: "https://line.me/shop21", description: "น้ำเต้าหู้ร้อนหวานน้อย ปาท่องโก๋กรอบ เปิดเช้า 6 โมง",              rating: 3.9, reviews: 21,  verified: false, location: "สุพรรณบุรี",              is_closed: false, is_blacklisted: false, img_emoji: "🥛", tags: ["น้ำเต้าหู้","เช้า","ร้อน"] },
+  { id: 22, name: "พิซซ่าหน้าไทยอินเตอร์",     category: "อาหาร",      tier: 2, entity_type: "company",    link: "https://line.me/shop22", description: "พิซซ่าหน้าไทยสไตล์อินเตอร์ ต้มยำกุ้ง ส้มตำทะเล สั่งเดลิเวอรี่ได้",  rating: 4.3, reviews: 189, verified: true,  location: "รัชดา, กรุงเทพฯ",        is_closed: false, is_blacklisted: false, img_emoji: "🍕", tags: ["พิซซ่า","หน้าไทย","เดลิเวอรี่"] },
+  { id: 23, name: "บราวนี่ชอคโกแลตเข้มข้น",    category: "ขนม",        tier: 2, entity_type: "individual", link: "https://line.me/shop23", description: "บราวนี่ชอคเข้มข้น ฟัดจ์กลาง กรอบนอกนุ่มใน อบสดทุกออเดอร์",        rating: 4.5, reviews: 134, verified: true,  location: "ประชาอุทิศ, กรุงเทพฯ",   is_closed: false, is_blacklisted: false, img_emoji: "🍫", tags: ["บราวนี่","ชอคโกแลต","อบสด"] },
+  { id: 24, name: "โซดาน้ำผึ้งมะนาวสดชื่น",    category: "เครื่องดื่ม", tier: 1, entity_type: "individual", link: "https://line.me/shop24", description: "โซดาน้ำผึ้งมะนาวสด ไม่มีน้ำตาลทราย หวานธรรมชาติ รีเฟรชมาก",       rating: 4.0, reviews: 18,  verified: false, is_closed: false, is_blacklisted: false, location: "ลำลูกกา, ปทุมธานี",      img_emoji: "🍋", tags: ["โซดา","มะนาว","สดชื่น"] },
+  // ร้านที่ปิดบริการแล้ว
+  { id: 25, name: "ร้านข้าวผัดหมูกรอบปิดไปแล้ว", category: "อาหาร",      tier: 2, entity_type: "individual", link: "https://line.me/shop25", description: "ข้าวผัดหมูกรอบสูตรโบราณ เปิดมา 15 ปี ปัจจุบันปิดบริการแล้ว",      rating: 4.3, reviews: 201, verified: true,  is_closed: true,  is_blacklisted: false, location: "บางกอกน้อย, กรุงเทพฯ",   img_emoji: "🍚", tags: ["ข้าวผัด","หมูกรอบ","ปิดแล้ว"] },
+  // ร้าน Blacklist
+  { id: 26, name: "ร้านต้มยำโกงเงินลูกค้า",      category: "อาหาร",      tier: 1, entity_type: "individual", link: "https://line.me/shop26", description: "ต้มยำกุ้งน้ำข้น ถูกรายงานและแบนออกจากระบบ",                    rating: 2.1, reviews: 48,  verified: false, is_closed: false, is_blacklisted: true,  location: "มีนบุรี, กรุงเทพฯ",       img_emoji: "🦐", tags: ["ต้มยำ","แบน"] },
+  { id: 27, name: "ร้านขนมปลอมแปลงสินค้า",       category: "ขนม",        tier: 1, entity_type: "company",    link: "https://line.me/shop27", description: "ขนมปังแซนด์วิช พบว่าโฆษณาเกินจริงและถูกแบน",                   rating: 1.8, reviews: 22,  verified: false, is_closed: false, is_blacklisted: true,  location: "ลาดพร้าว, กรุงเทพฯ",      img_emoji: "🥪", tags: ["ขนมปัง","แซนด์วิช","แบน"] },
 ];
 
+// ============================================================
+// PAGINATION LAYER — รองรับ mock และ production API
+// ============================================================
+const USE_MOCK = true; // ← false เมื่อ integrate กับ PHP server จริง
+const ITEMS_PER_PAGE = 8;
+
+// Mock: filter + paginate ฝั่ง client
+// tierFilter: "all" | "tier1+" | "tier2+" | "tier3" | "blacklist"
+// showClosed: true | false
+function searchShopsMock({ query, category, page, tierFilter = "all", showClosed = false, featuredOnly = false, withPagination = true }) {
+  let filtered = MOCK_SHOPS_ALL.filter(s => {
+    // category filter
+    if (category !== "ทั้งหมด" && s.category !== category) return false;
+    // query filter
+    if (query !== "" && !s.name.includes(query) && !s.description.includes(query) && !s.tags.some(t => t.includes(query))) return false;
+    // tier / blacklist filter
+    if (tierFilter === "blacklist") { if (!s.is_blacklisted) return false; }
+    else if (tierFilter === "tier1+") { if (s.is_blacklisted || s.tier < 1) return false; }
+    else if (tierFilter === "tier2+") { if (s.is_blacklisted || s.tier < 2) return false; }
+    else if (tierFilter === "tier3")  { if (s.is_blacklisted || s.tier < 3) return false; }
+    else { /* "all" — include everything including blacklist when searching */ }
+    // closed filter
+    if (!showClosed && s.is_closed) return false;
+    return true;
+  });
+
+  if (featuredOnly) {
+    // หน้าหลัก: แนะนำ 10 ร้าน — เฉพาะร้าน active tier สูง คะแนนดี
+    filtered = filtered
+      .filter(s => !s.is_blacklisted && !s.is_closed)
+      .sort((a, b) => (b.tier * 10 + b.rating) - (a.tier * 10 + a.rating))
+      .slice(0, 10);
+    return { items: filtered, totalItems: filtered.length, totalPages: 1, currentPage: 1 };
+  }
+
+  if (!withPagination) return { items: filtered, totalItems: filtered.length, totalPages: 1, currentPage: 1 };
+
+  const totalItems = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
+  const safePage = Math.min(Math.max(1, page), totalPages);
+  const items = filtered.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE);
+  return { items, totalItems, totalPages, currentPage: safePage };
+}
+
+// Production: PHP API ต้อง return { items, totalItems, totalPages, currentPage }
+// ตัวอย่าง PHP: SELECT * FROM shops WHERE ... LIMIT 8 OFFSET (page-1)*8
+async function searchShopsAPI({ query, category, page }) {
+  const params = new URLSearchParams({ q: query, category, page, limit: ITEMS_PER_PAGE });
+  const res = await fetch(`${API_BASE}/shops?${params}`);
+  if (!res.ok) throw new Error("API error " + res.status);
+  return res.json();
+}
+
+// Unified hook — สลับ mock/production ด้วย USE_MOCK flag
+function useShopSearch({ query, category, page, tierFilter = "all", showClosed = false, featuredOnly = false, withPagination = true }) {
+  const [state, setState] = useState({
+    items: [], totalItems: 0, totalPages: 1, currentPage: 1, loading: true, error: null,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    setState(s => ({ ...s, loading: true, error: null }));
+
+    const run = async () => {
+      try {
+        const result = USE_MOCK
+          ? searchShopsMock({ query, category, page, tierFilter, showClosed, featuredOnly, withPagination })
+          : await searchShopsAPI({ query, category, page, tierFilter, showClosed });
+        if (!cancelled) setState({ ...result, loading: false, error: null });
+      } catch (err) {
+        if (!cancelled) setState(s => ({ ...s, loading: false, error: err.message }));
+      }
+    };
+
+    const delay = USE_MOCK ? 0 : 300;
+    const timer = setTimeout(run, query && !USE_MOCK ? delay : 0);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [query, category, page, tierFilter, showClosed, featuredOnly, withPagination]);
+
+  return state;
+}
+
 const MOCK_MY_SHOP = {
-  id: 10, name: "ร้านผัดไทยนายดี", category: "อาหาร", tier: 1, current_tier: 1,
+  id: 10, name: "ร้านผัดไทยนายดี", category: "อาหาร", tier: 1, current_tier: 1, entity_type: "individual",
   link: "https://line.me/my-shop", description: "ผัดไทยกุ้งสด เส้นเหนียวหนึบ ไข่ห่อ เสิร์ฟพร้อมผักสด",
-  rating: 4.5, orders_count: 143, img_emoji: "🍝",
+  rating: 4.5, orders_count: 143, is_closed: false, is_blacklisted: false, img_emoji: "🍝",
   upgrade_history: [
     { round: 1, tier_requested: 2, status: "rejected", reason: "เอกสารภาพไม่ชัดเจน", date: "15/01/2568" },
     { round: 2, tier_requested: 2, status: "pending", date: "10/03/2568" },
@@ -63,6 +168,7 @@ const styles = `
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+  /* LIGHT MODE (default) */
   :root {
     --bg: #faf8f5;
     --surface: #ffffff;
@@ -91,14 +197,65 @@ const styles = `
     --display: 'Mitr', sans-serif;
     --radius: 12px;
     --radius-sm: 8px;
+    --navbar-bg: rgba(250,248,245,0.92);
   }
 
-  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.6; }
+  /* DARK MODE */
+  [data-theme="dark"] {
+    --bg: #0f0e0c;
+    --surface: #1a1815;
+    --surface2: #242220;
+    --border: #2e2c28;
+    --border2: #3a3834;
+    --accent: #f97316;
+    --accent2: #ea6b10;
+    --accent-light: rgba(249,115,22,0.12);
+    --accent-glow: rgba(249,115,22,0.18);
+    --green: #22c55e;
+    --green-light: rgba(34,197,94,0.1);
+    --yellow: #fbbf24;
+    --yellow-light: rgba(251,191,36,0.1);
+    --blue: #60a5fa;
+    --blue-light: rgba(96,165,250,0.1);
+    --red: #f87171;
+    --red-light: rgba(248,113,113,0.1);
+    --text: #f0ede8;
+    --text2: #b0a898;
+    --text3: #6e6558;
+    --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.2);
+    --shadow-md: 0 4px 20px rgba(0,0,0,0.4), 0 1px 4px rgba(0,0,0,0.2);
+    --shadow-lg: 0 8px 40px rgba(0,0,0,0.6);
+    --navbar-bg: rgba(15,14,12,0.92);
+  }
+
+  /* dark overrides for hardcoded colors */
+  [data-theme="dark"] .badge-tier2 { background: rgba(59,91,219,0.2); color: #93a8f4; border-color: rgba(59,91,219,0.3); }
+  [data-theme="dark"] .badge-tier3 { background: rgba(180,83,9,0.2); color: #fbbf24; border-color: rgba(180,83,9,0.3); }
+  [data-theme="dark"] .tier-2 { background: rgba(59,91,219,0.1); border-color: rgba(59,91,219,0.25); }
+  [data-theme="dark"] .tier-3 { background: rgba(180,83,9,0.1); border-color: rgba(180,83,9,0.25); }
+  [data-theme="dark"] .alert-warn { background: rgba(251,191,36,0.1); color: #fde68a; border-color: rgba(251,191,36,0.2); }
+  [data-theme="dark"] .alert-success { background: rgba(34,197,94,0.1); color: #86efac; border-color: rgba(34,197,94,0.2); }
+  [data-theme="dark"] .alert-error { background: rgba(248,113,113,0.1); color: #fca5a5; border-color: rgba(248,113,113,0.2); }
+  [data-theme="dark"] .alert-info { background: rgba(96,165,250,0.1); color: #93c5fd; border-color: rgba(96,165,250,0.2); }
+  [data-theme="dark"] .google-btn { background: #2a2826; color: #f0ede8; border-color: #3a3834; }
+  [data-theme="dark"] .google-btn:hover { background: #333130; }
+
+  /* THEME TOGGLE */
+  .theme-toggle {
+    width: 36px; height: 36px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--surface2); border: 1.5px solid var(--border2);
+    cursor: pointer; font-size: 16px; transition: all 0.2s;
+    flex-shrink: 0;
+  }
+  .theme-toggle:hover { background: var(--border); transform: rotate(15deg); }
+
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.6; transition: background 0.2s, color 0.2s; }
 
   /* NAVBAR */
   .navbar {
     position: sticky; top: 0; z-index: 50;
-    background: rgba(250,248,245,0.92); backdrop-filter: blur(12px);
+    background: var(--navbar-bg); backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border);
     padding: 0 24px; height: 60px;
     display: flex; align-items: center; justify-content: space-between;
@@ -287,9 +444,56 @@ const styles = `
   .google-btn { width: 100%; padding: 13px; background: #fff; color: #333; border: 1.5px solid #dadce0; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.15s; font-family: var(--font); box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
   .google-btn:hover { background: #f8f9fa; box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
 
+  /* PAGINATION */
+  .pagination-wrap { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 36px; padding-bottom: 8px; }
+  .page-btn {
+    min-width: 38px; height: 38px; padding: 0 8px;
+    border-radius: 9px; font-size: 14px; font-weight: 700;
+    cursor: pointer; border: 1.5px solid var(--border2);
+    background: var(--surface); color: var(--text2);
+    transition: all 0.15s; font-family: var(--font);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .page-btn:hover:not(:disabled) { background: var(--surface2); color: var(--text); border-color: var(--text3); }
+  .page-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: 0 2px 8px var(--accent-glow); }
+  .page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .page-dots { color: var(--text3); font-size: 14px; padding: 0 4px; user-select: none; }
+
+  /* SKELETON LOADING */
+  @keyframes shimmer { 0% { background-position: -400px 0 } 100% { background-position: 400px 0 } }
+  .skeleton-card { pointer-events: none; }
+  .skeleton-thumb {
+    height: 120px;
+    background: linear-gradient(90deg, var(--surface2) 25%, var(--border) 50%, var(--surface2) 75%);
+    background-size: 400px 100%;
+    animation: shimmer 1.4s infinite linear;
+  }
+  .skeleton-body { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .skeleton-line {
+    height: 13px; border-radius: 6px;
+    background: linear-gradient(90deg, var(--surface2) 25%, var(--border) 50%, var(--surface2) 75%);
+    background-size: 400px 100%;
+    animation: shimmer 1.4s infinite linear;
+  }
+
   @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
   @keyframes slideUp { from { transform: translateY(14px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
   @keyframes slideIn { from { transform: translateX(16px); opacity: 0 } to { transform: translateX(0); opacity: 1 } }
+
+  /* NAV TABS */
+  .nav-center { display: flex; align-items: center; gap: 4px; }
+  .nav-tab {
+    padding: 7px 14px; border-radius: 8px; font-size: 13.5px; font-weight: 600;
+    cursor: pointer; border: 1.5px solid transparent;
+    background: transparent; color: var(--text2); font-family: var(--font);
+    transition: all 0.15s;
+  }
+  .nav-tab:hover { background: var(--surface2); color: var(--text); }
+  .nav-tab.active { background: var(--accent-light); color: var(--accent); border-color: rgba(232,93,38,0.2); }
+
+  /* MUTED SHOP CARD (blacklist / closed) */
+  .shop-card-muted { opacity: 0.72; }
+  .shop-card-muted:hover { opacity: 1; }
 
   /* RESPONSIVE */
   @media (max-width: 640px) {
@@ -298,6 +502,7 @@ const styles = `
     .stat-row { grid-template-columns: repeat(2, 1fr); }
     .navbar { padding: 0 16px; }
     .section { padding: 0 16px 40px; }
+    .nav-center { display: none; }
   }
 `;
 
@@ -333,7 +538,7 @@ function Modal({ title, onClose, children, footer, wide }) {
 // ============================================================
 // NAVBAR
 // ============================================================
-function Navbar({ user, onNavigate, page }) {
+function Navbar({ user, onNavigate, darkMode, toggleDark, currentPage }) {
   const [showLogin, setShowLogin] = useState(false);
   const handleGoogleLogin = () => {
     // TODO: Google OAuth
@@ -345,6 +550,10 @@ function Navbar({ user, onNavigate, page }) {
     <>
       <nav className="navbar">
         <div className="nav-brand" onClick={() => onNavigate("home")}>my<span>Order</span></div>
+        <div className="nav-center">
+          <button className={`nav-tab ${currentPage === "home" ? "active" : ""}`} onClick={() => onNavigate("home")}>🏠 หน้าหลัก</button>
+          <button className={`nav-tab ${currentPage === "shop-list" ? "active" : ""}`} onClick={() => onNavigate("shop-list")}>🏪 ร้านค้าทั้งหมด</button>
+        </div>
         <div className="nav-right">
           {user ? (
             <>
@@ -354,6 +563,9 @@ function Navbar({ user, onNavigate, page }) {
           ) : (
             <button className="btn btn-primary btn-sm" onClick={() => setShowLogin(true)}>เข้าสู่ระบบ</button>
           )}
+          <button className="theme-toggle" onClick={toggleDark} title={darkMode ? "เปลี่ยนเป็น Light Mode" : "เปลี่ยนเป็น Dark Mode"}>
+            {darkMode ? "☀️" : "🌙"}
+          </button>
         </div>
       </nav>
       {showLogin && (
@@ -373,17 +585,146 @@ function Navbar({ user, onNavigate, page }) {
 }
 
 // ============================================================
+// PAGINATION COMPONENT
+// ============================================================
+function Pagination({ currentPage, totalPages, onChange }) {
+  if (totalPages <= 1) return null;
+
+  // แสดงเลขหน้าแบบ smart: 1 ... 4 5 6 ... 10
+  const getPages = () => {
+    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    const pages = [];
+    pages.push(1);
+    if (currentPage > 3) pages.push("...");
+    for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) pages.push(i);
+    if (currentPage < totalPages - 2) pages.push("...");
+    pages.push(totalPages);
+    return pages;
+  };
+
+  return (
+    <div className="pagination-wrap">
+      <button className="page-btn" onClick={() => onChange(currentPage - 1)} disabled={currentPage === 1}>‹</button>
+      {getPages().map((p, i) =>
+        p === "..." ? (
+          <span key={`dots-${i}`} className="page-dots">···</span>
+        ) : (
+          <button key={p} className={`page-btn ${p === currentPage ? "active" : ""}`} onClick={() => onChange(p)}>{p}</button>
+        )
+      )}
+      <button className="page-btn" onClick={() => onChange(currentPage + 1)} disabled={currentPage === totalPages}>›</button>
+    </div>
+  );
+}
+
+// ============================================================
+// SHARED: ShopCard Component
+// ============================================================
+function ShopCard({ shop, onNavigate }) {
+  const isBad = shop.is_blacklisted || shop.is_closed;
+  return (
+    <div className={`shop-card ${isBad ? "shop-card-muted" : ""}`} onClick={() => onNavigate("shop-detail", shop)}>
+      <div className="shop-card-thumb">
+        {shop.img_emoji}
+        <div className="tier-badge-abs">
+          {shop.is_blacklisted
+            ? <span className="badge badge-red">⛔ Blacklist</span>
+            : shop.is_closed
+              ? <span className="badge badge-gray">🔒 ปิดแล้ว</span>
+              : <TierBadge tier={shop.tier} />}
+        </div>
+      </div>
+      <div className="shop-card-body">
+        <div className="shop-card-name" style={isBad ? { color: "var(--text3)" } : {}}>{shop.name}</div>
+        <div className="shop-card-desc">{shop.description}</div>
+        <div className="shop-card-meta">
+          <span className="shop-card-rating">⭐ {shop.rating} ({shop.reviews})</span>
+          <span className="shop-card-loc">📍 {shop.location.split(",")[0]}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// SHARED: Skeleton Grid
+// ============================================================
+function SkeletonGrid({ count = 8 }) {
+  return (
+    <div className="shop-grid">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="shop-card skeleton-card">
+          <div className="skeleton-thumb" />
+          <div className="skeleton-body">
+            <div className="skeleton-line" style={{ width: "70%" }} />
+            <div className="skeleton-line" style={{ width: "90%" }} />
+            <div className="skeleton-line" style={{ width: "50%" }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ============================================================
 // PAGE 1: HOME
+// - ไม่ search: แสดงร้านแนะนำ 10 ร้าน (ไม่มี pagination)
+// - search แล้ว: แสดงผลลัพธ์พร้อม pagination รวม blacklist + ร้านปิด
+// - กด "หน้าหลัก" / refresh: clear search กลับไปโหมดแนะนำ
 // ============================================================
 function HomePage({ onNavigate }) {
-  const [query, setQuery] = useState("");
+  const [inputVal, setInputVal] = useState("");
+  const [query, setQuery]       = useState("");
   const [category, setCategory] = useState("ทั้งหมด");
+  const [searchPage, setSearchPage] = useState(1);
   const categories = ["ทั้งหมด", "อาหาร", "ขนม", "เครื่องดื่ม"];
 
-  const filtered = MOCK_SHOPS.filter(s =>
-    (category === "ทั้งหมด" || s.category === category) &&
-    (s.name.includes(query) || s.description.includes(query) || query === "")
-  );
+  const isSearching = query !== "" || category !== "ทั้งหมด";
+
+  // featured 10 ร้าน — โหลดครั้งเดียว ไม่ขึ้นกับ search state
+  const { items: featured, loading: loadFeatured } = useShopSearch({
+    query: "", category: "ทั้งหมด", page: 1,
+    featuredOnly: true, withPagination: false,
+  });
+
+  // ผลค้นหา — มี pagination, รวม blacklist + ร้านปิด
+  const {
+    items: results,
+    totalItems,
+    totalPages,
+    currentPage,
+    loading: loadSearch,
+  } = useShopSearch({
+    query,
+    category,
+    page: searchPage,
+    tierFilter: "all",
+    showClosed: true,
+    withPagination: true,  // ← เปิด pagination
+  });
+
+  const handleSearch = () => {
+    setQuery(inputVal);
+    setSearchPage(1);  // reset หน้าทุกครั้งที่ search ใหม่
+  };
+
+  const handleCategory = (c) => {
+    setCategory(c);
+    setSearchPage(1);
+  };
+
+  const handlePageChange = (p) => {
+    setSearchPage(p);
+    // scroll ขึ้นไปที่ผลลัพธ์ ไม่ใช่ top สุด
+    document.querySelector(".home-results")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const handleClearSearch = () => {
+    setInputVal("");
+    setQuery("");
+    setCategory("ทั้งหมด");
+    setSearchPage(1);
+  };
 
   return (
     <div className="page">
@@ -391,41 +732,196 @@ function HomePage({ onNavigate }) {
         <h1 className="hero-title">ค้นหาร้านค้าที่คุณ<span>ไว้วางใจ</span></h1>
         <p className="hero-sub">ค้นหาร้านค้าที่ผ่านการยืนยันตัวตนแล้ว ปลอดภัย มั่นใจ</p>
         <div className="search-box">
-          <input className="search-input" placeholder="พิมพ์ชื่อร้าน หรือประเภทสินค้า..." value={query} onChange={e => setQuery(e.target.value)} />
-          <button className="search-btn">🔍</button>
+          <input
+            className="search-input"
+            placeholder="พิมพ์ชื่อร้าน ประเภทสินค้า หรือชื่อที่ต้องการตรวจสอบ..."
+            value={inputVal}
+            onChange={e => setInputVal(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && handleSearch()}
+          />
+          {isSearching && (
+            <button
+              onClick={handleClearSearch}
+              style={{ padding: "0 14px", background: "transparent", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: 18, lineHeight: 1 }}
+              title="ล้างการค้นหา"
+            >✕</button>
+          )}
+          <button className="search-btn" onClick={handleSearch}>🔍</button>
         </div>
       </div>
 
-      <div className="section">
-        <div className="category-pills">
-          {categories.map(c => <button key={c} className={`pill ${category === c ? "active" : ""}`} onClick={() => setCategory(c)}>{c}</button>)}
-        </div>
+      <div className="section home-results">
+        {/* Category filter — แสดงเฉพาะตอน search */}
+        {isSearching && (
+          <div className="category-pills">
+            {categories.map(c => (
+              <button
+                key={c}
+                className={`pill ${category === c ? "active" : ""}`}
+                onClick={() => handleCategory(c)}
+              >{c}</button>
+            ))}
+          </div>
+        )}
 
         <div className="section-header">
           <div>
-            <div className="section-title">{query ? `ผลการค้นหา "${query}"` : "ร้านค้าแนะนำ"}</div>
-            <div className="section-sub">พบ {filtered.length} ร้านค้า</div>
+            <div className="section-title">
+              {isSearching
+                ? `ผลการค้นหา "${query || "ทุกร้าน"}"`
+                : "⭐ ร้านค้าแนะนำ"}
+            </div>
+            <div className="section-sub">
+              {isSearching
+                ? loadSearch
+                  ? "กำลังโหลด..."
+                  : `พบ ${totalItems} ร้านค้า (รวม Blacklist และร้านปิดแล้ว) · หน้า ${currentPage} / ${totalPages}`
+                : "คัดสรรจากร้านที่มีคะแนนสูงและผ่านการยืนยัน"}
+            </div>
+          </div>
+          {/* ปุ่ม clear search */}
+          {isSearching && (
+            <button className="btn btn-ghost btn-sm" onClick={handleClearSearch}>
+              ✕ ล้างการค้นหา
+            </button>
+          )}
+        </div>
+
+        {/* SEARCH MODE — มี pagination */}
+        {isSearching ? (
+          loadSearch ? <SkeletonGrid count={ITEMS_PER_PAGE} /> :
+          results.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--text3)" }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>🔍</div>
+              <p>ไม่พบร้านค้าที่ตรงกับการค้นหา</p>
+              <button className="btn btn-ghost btn-sm" style={{ marginTop: 16 }} onClick={handleClearSearch}>
+                กลับร้านแนะนำ
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="shop-grid">
+                {results.map(shop => (
+                  <ShopCard key={shop.id} shop={shop} onNavigate={onNavigate} />
+                ))}
+              </div>
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onChange={handlePageChange}
+              />
+            </>
+          )
+        ) : (
+          /* FEATURED MODE — ไม่มี pagination */
+          loadFeatured ? <SkeletonGrid count={10} /> :
+          <div className="shop-grid">
+            {featured.map(shop => (
+              <ShopCard key={shop.id} shop={shop} onNavigate={onNavigate} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// PAGE 1B: SHOP LIST (รายการร้านทั้งหมด + filter + pagination)
+// ============================================================
+function ShopListPage({ onNavigate }) {
+  const [inputVal, setInputVal] = useState("");
+  const [query, setQuery]       = useState("");
+  const [category, setCategory] = useState("ทั้งหมด");
+  const [tierFilter, setTierFilter] = useState("all");
+  const [showClosed, setShowClosed] = useState(false);
+  const [page, setPage]         = useState(1);
+
+  const categories = ["ทั้งหมด", "อาหาร", "ขนม", "เครื่องดื่ม"];
+  const tierFilters = [
+    { val: "all",       label: "ทุกร้าน" },
+    { val: "tier1+",    label: "⚪ ขั้น 1 ขึ้นไป" },
+    { val: "tier2+",    label: "🔵 ขั้น 2 ขึ้นไป" },
+    { val: "tier3",     label: "🥇 ขั้น 3 เท่านั้น" },
+    { val: "blacklist", label: "⛔ Blacklist" },
+  ];
+
+  const { items, totalItems, totalPages, currentPage, loading, error } = useShopSearch({
+    query, category, page, tierFilter, showClosed,
+  });
+
+  const handleSearch = () => { setQuery(inputVal); setPage(1); };
+  const handleCategory = (c) => { setCategory(c); setPage(1); };
+  const handleTierFilter = (v) => { setTierFilter(v); setPage(1); };
+  const handlePageChange = (p) => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); };
+
+  return (
+    <div className="page">
+      <div style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)", padding: "16px 24px" }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+          {/* Search bar — ต่อเนื่องจาก navbar */}
+          <div className="search-box" style={{ marginBottom: 14, maxWidth: "100%" }}>
+            <input
+              className="search-input"
+              placeholder="ค้นหาชื่อร้านค้า..."
+              value={inputVal}
+              onChange={e => setInputVal(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleSearch()}
+            />
+            <button className="search-btn" onClick={handleSearch}>🔍</button>
+          </div>
+
+          {/* Filters row */}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ fontSize: 12, color: "var(--text3)", fontWeight: 700, marginRight: 4 }}>หมวดหมู่:</span>
+            {categories.map(c => (
+              <button key={c} className={`pill ${category === c ? "active" : ""}`} style={{ padding: "5px 12px", fontSize: 12 }} onClick={() => handleCategory(c)}>{c}</button>
+            ))}
+            <div style={{ width: 1, height: 20, background: "var(--border2)", margin: "0 4px" }} />
+            <span style={{ fontSize: 12, color: "var(--text3)", fontWeight: 700, marginRight: 4 }}>ระดับ:</span>
+            {tierFilters.map(f => (
+              <button key={f.val} className={`pill ${tierFilter === f.val ? "active" : ""}`} style={{ padding: "5px 12px", fontSize: 12 }} onClick={() => handleTierFilter(f.val)}>{f.label}</button>
+            ))}
+            <div style={{ width: 1, height: 20, background: "var(--border2)", margin: "0 4px" }} />
+            <button
+              className={`pill ${showClosed ? "active" : ""}`}
+              style={{ padding: "5px 12px", fontSize: 12 }}
+              onClick={() => { setShowClosed(v => !v); setPage(1); }}
+            >🔒 รวมร้านปิด</button>
+          </div>
+        </div>
+      </div>
+
+      <div className="section" style={{ paddingTop: 24 }}>
+        <div className="section-header">
+          <div>
+            <div className="section-title">รายการร้านค้า</div>
+            <div className="section-sub">
+              {loading ? "กำลังโหลด..." : `พบ ${totalItems} ร้านค้า · หน้า ${currentPage} / ${totalPages}`}
+            </div>
           </div>
         </div>
 
-        <div className="shop-grid">
-          {filtered.map(shop => (
-            <div className="shop-card" key={shop.id} onClick={() => onNavigate("shop-detail", shop)}>
-              <div className="shop-card-thumb">
-                {shop.img_emoji}
-                <div className="tier-badge-abs"><TierBadge tier={shop.tier} /></div>
-              </div>
-              <div className="shop-card-body">
-                <div className="shop-card-name">{shop.name}</div>
-                <div className="shop-card-desc">{shop.description}</div>
-                <div className="shop-card-meta">
-                  <span className="shop-card-rating">⭐ {shop.rating} ({shop.reviews})</span>
-                  <span className="shop-card-loc">📍 {shop.location.split(",")[0]}</span>
-                </div>
-              </div>
+        {error && (
+          <div style={{ padding: 20, color: "var(--red)", background: "var(--red-light)", borderRadius: 12, marginBottom: 20 }}>
+            ⚠️ {error}
+          </div>
+        )}
+
+        {loading ? <SkeletonGrid /> :
+         items.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--text3)" }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>🔍</div>
+            <p>ไม่พบร้านค้า</p>
+          </div>
+         ) : (
+          <>
+            <div className="shop-grid">
+              {items.map(shop => <ShopCard key={shop.id} shop={shop} onNavigate={onNavigate} />)}
             </div>
-          ))}
-        </div>
+            <Pagination currentPage={currentPage} totalPages={totalPages} onChange={handlePageChange} />
+          </>
+        )}
       </div>
     </div>
   );
@@ -436,16 +932,48 @@ function HomePage({ onNavigate }) {
 // ============================================================
 function ShopDetailPage({ shop, user, onNavigate, notify }) {
   const [showReport, setShowReport] = useState(false);
-  const [report, setReport] = useState({ reason: "", detail: "", file: null });
-  const fileRef = useRef();
+  const [showClaim, setShowClaim]   = useState(false);
+  const [report, setReport] = useState({ reason: "", detail: "" });
+  const [claim, setClaim]   = useState({ contact: "", detail: "" });
+  const [attachments, setAttachments]      = useState([{ id: Date.now(), topic: "", file: null }]);
+  const [claimAttachments, setClaimAttachments] = useState([{ id: Date.now(), topic: "", file: null }]);
+
+  const addAttachment    = () => setAttachments(p => [...p, { id: Date.now(), topic: "", file: null }]);
+  const removeAttachment = (id) => setAttachments(p => p.filter(a => a.id !== id));
+  const updateAttachment = (id, field, val) => setAttachments(p => p.map(a => a.id === id ? { ...a, [field]: val } : a));
+
+  const resetReport = () => {
+    setReport({ reason: "", detail: "" });
+    setAttachments([{ id: Date.now(), topic: "", file: null }]);
+  };
+
+  const resetClaim = () => {
+    setClaim({ contact: "", detail: "" });
+    setClaimAttachments([{ id: Date.now(), topic: "", file: null }]);
+  };
+
+  const handleClaim = () => {
+    if (!user) { notify("กรุณาเข้าสู่ระบบก่อน", "error"); setShowClaim(false); return; }
+    if (!claim.contact || !claim.detail) return;
+    const validAttachments = claimAttachments.filter(a => a.file !== null);
+    // TODO: await api.submitClaim(shop.id, { ...claim, attachments: validAttachments })
+    setShowClaim(false);
+    notify("ส่งเรื่องเคลมเรียบร้อยแล้ว ทีมงานจะติดต่อกลับ", "success");
+    resetClaim();
+  };
+
+  const addClaimAtt    = () => setClaimAttachments(p => [...p, { id: Date.now(), topic: "", file: null }]);
+  const removeClaimAtt = (id) => setClaimAttachments(p => p.filter(a => a.id !== id));
+  const updateClaimAtt = (id, field, val) => setClaimAttachments(p => p.map(a => a.id === id ? { ...a, [field]: val } : a));
 
   const handleReport = () => {
     if (!user) { notify("กรุณาเข้าสู่ระบบก่อน", "error"); setShowReport(false); return; }
     if (!report.reason || !report.detail) return;
-    // TODO: await api.reportShop(shop.id, { reason: report.reason, detail: report.detail, file: report.file })
+    const validAttachments = attachments.filter(a => a.file !== null);
+    // TODO: await api.reportShop(shop.id, { ...report, attachments: validAttachments })
     setShowReport(false);
     notify("ส่งรายงานเรียบร้อยแล้ว ขอบคุณครับ", "success");
-    setReport({ reason: "", detail: "", file: null });
+    resetReport();
   };
 
   const tierDesc = { 1: "ร้านค้าทั่วไป ยังไม่ได้ยืนยันตัวตน", 2: "ยืนยันตัวตนระดับเอกสาร", 3: "ยืนยันตัวตนสูงสุด มีประวัติการสั่งของจาก myOrder" };
@@ -462,6 +990,9 @@ function ShopDetailPage({ shop, user, onNavigate, notify }) {
             <div className="shop-detail-meta">
               <TierBadge tier={shop.tier} />
               <span className="badge badge-gray">{shop.category}</span>
+              <span className="badge" style={{ background: shop.entity_type === "company" ? "#ede9fe" : "#fce7f3", color: shop.entity_type === "company" ? "#6d28d9" : "#be185d", border: `1px solid ${shop.entity_type === "company" ? "#c4b5fd" : "#fbcfe8"}` }}>
+                {shop.entity_type === "company" ? "🏢 นิติบุคคล" : "👤 บุคคลธรรมดา"}
+              </span>
               <span style={{ fontSize: 14, color: "var(--yellow)", fontWeight: 700 }}>⭐ {shop.rating}</span>
               <span style={{ fontSize: 13, color: "var(--text3)" }}>({shop.reviews} รีวิว)</span>
             </div>
@@ -469,10 +1000,19 @@ function ShopDetailPage({ shop, user, onNavigate, notify }) {
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
               {shop.tags.map(t => <span className="tag" key={t}>#{t}</span>)}
             </div>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <a href={shop.link} className="btn btn-primary" target="_blank" rel="noreferrer">🔗 ติดต่อร้านค้า</a>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
+              {!shop.is_closed && !shop.is_blacklisted && (
+                <a href={shop.link} className="btn btn-primary" target="_blank" rel="noreferrer">🔗 ติดต่อร้านค้า</a>
+              )}
               <button className="btn btn-outline" onClick={() => setShowReport(true)}>🚩 รายงานร้านค้า</button>
+              <button className="btn btn-outline" onClick={() => setShowClaim(true)} style={{ borderColor: "var(--blue)", color: "var(--blue)" }}>⚖️ เคลมปัญหา</button>
             </div>
+            {shop.is_closed && (
+              <div className="alert alert-warn" style={{ marginTop: 4 }}>🔒 ร้านนี้ปิดบริการแล้ว อาจไม่สามารถติดต่อได้</div>
+            )}
+            {shop.is_blacklisted && (
+              <div className="alert alert-error" style={{ marginTop: 4 }}>⛔ ร้านนี้ถูกระงับจากระบบ เนื่องจากละเมิดข้อกำหนด</div>
+            )}
           </div>
         </div>
 
@@ -491,17 +1031,31 @@ function ShopDetailPage({ shop, user, onNavigate, notify }) {
 
         <div className="dash-card">
           <div className="detail-row"><div className="detail-label">📍 ที่อยู่</div><div className="detail-value">{shop.location}</div></div>
-          <div className="detail-row"><div className="detail-label">🔗 ลิงก์ติดต่อ</div><div className="detail-value"><a href={shop.link} style={{ color: "var(--accent)" }} target="_blank" rel="noreferrer">{shop.link}</a></div></div>
+          <div className="detail-row"><div className="detail-label">👤 ประเภท</div><div className="detail-value">{shop.entity_type === "company" ? "นิติบุคคล" : "บุคคลธรรมดา"}</div></div>
+          <div className="detail-row">
+            <div className="detail-label">🏷️ สถานะร้าน</div>
+            <div className="detail-value">
+              {shop.is_blacklisted
+                ? <span className="badge badge-red">⛔ ถูกระงับ (Blacklist)</span>
+                : shop.is_closed
+                  ? <span className="badge badge-gray">🔒 ปิดบริการแล้ว</span>
+                  : <span className="badge badge-green">✓ เปิดให้บริการ</span>}
+            </div>
+          </div>
+          {!shop.is_closed && !shop.is_blacklisted && (
+            <div className="detail-row"><div className="detail-label">🔗 ลิงก์ติดต่อ</div><div className="detail-value"><a href={shop.link} style={{ color: "var(--accent)" }} target="_blank" rel="noreferrer">{shop.link}</a></div></div>
+          )}
         </div>
       </div>
 
       {showReport && (
-        <Modal title="รายงานร้านค้า" onClose={() => setShowReport(false)}
+        <Modal title="รายงานร้านค้า" onClose={() => { setShowReport(false); resetReport(); }} wide
           footer={<>
-            <button className="btn btn-ghost btn-sm" onClick={() => setShowReport(false)}>ยกเลิก</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => { setShowReport(false); resetReport(); }}>ยกเลิก</button>
             <button className="btn btn-danger btn-sm" onClick={handleReport} disabled={!report.reason || !report.detail}>ส่งรายงาน</button>
           </>}>
           <div className="alert alert-warn" style={{ marginBottom: 16 }}>⚠️ การรายงานเท็จอาจส่งผลต่อบัญชีของคุณ กรุณาใส่ข้อมูลที่เป็นจริงเท่านั้น</div>
+
           <div className="form-group">
             <label className="form-label">ประเภทการรายงาน *</label>
             <select className="input" value={report.reason} onChange={e => setReport(p => ({ ...p, reason: e.target.value }))}>
@@ -513,18 +1067,104 @@ function ShopDetailPage({ shop, user, onNavigate, notify }) {
               <option>อื่นๆ</option>
             </select>
           </div>
+
           <div className="form-group">
             <label className="form-label">รายละเอียด *</label>
             <textarea className="input textarea" placeholder="อธิบายปัญหาโดยละเอียด..." value={report.detail} onChange={e => setReport(p => ({ ...p, detail: e.target.value }))} />
           </div>
+
+          {/* DYNAMIC ATTACHMENTS */}
           <div className="form-group">
-            <label className="form-label">แนบหลักฐาน (ไฟล์รูป / สลิป)</label>
-            <div className={`upload-zone ${report.file ? "filled" : ""}`} onClick={() => fileRef.current?.click()}>
-              <div className="upload-icon">{report.file ? "✅" : "📎"}</div>
-              <div className="upload-text">{report.file ? report.file.name : "คลิกเพื่อแนบไฟล์"}</div>
-              <div className="upload-sub">PNG, JPG, PDF ขนาดไม่เกิน 10MB</div>
-              <input ref={fileRef} type="file" style={{ display: "none" }} accept="image/*,.pdf" onChange={e => setReport(p => ({ ...p, file: e.target.files[0] }))} />
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <label className="form-label" style={{ margin: 0 }}>แนบหลักฐานประกอบ</label>
+              <button className="btn btn-ghost btn-sm" onClick={addAttachment} style={{ color: "var(--accent)", fontSize: 13 }}>＋ เพิ่มไฟล์</button>
             </div>
+
+            {attachments.map((att, idx) => (
+              <div key={att.id} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center", background: "var(--surface2)", padding: "8px 10px", borderRadius: 10, border: "1px solid var(--border)" }}>
+                <span style={{ fontSize: 12, color: "var(--text3)", minWidth: 20, textAlign: "center", fontWeight: 700 }}>{idx + 1}</span>
+                <input
+                  className="input"
+                  placeholder="หัวข้อ เช่น สลิปโอนเงิน, แชทสนทนา"
+                  value={att.topic}
+                  onChange={e => updateAttachment(att.id, "topic", e.target.value)}
+                  style={{ flex: 1, padding: "7px 10px", fontSize: 13 }}
+                />
+                <label className={`btn btn-sm ${att.file ? "btn-success" : "btn-outline"}`} style={{ margin: 0, cursor: "pointer", whiteSpace: "nowrap", fontSize: 12 }}>
+                  {att.file ? "✅ เลือกแล้ว" : "📎 เลือกไฟล์"}
+                  <input type="file" style={{ display: "none" }} accept="image/*,.pdf" onChange={e => updateAttachment(att.id, "file", e.target.files[0])} />
+                </label>
+                {att.file && (
+                  <span style={{ fontSize: 11, color: "var(--text3)", maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{att.file.name}</span>
+                )}
+                {attachments.length > 1 && (
+                  <button className="btn btn-ghost btn-sm btn-icon" onClick={() => removeAttachment(att.id)} style={{ color: "var(--red)", padding: "4px 8px" }}>✕</button>
+                )}
+              </div>
+            ))}
+            <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 6 }}>PNG, JPG, PDF ขนาดไม่เกิน 10MB ต่อไฟล์</div>
+          </div>
+        </Modal>
+      )}
+
+      {showClaim && (
+        <Modal title="⚖️ เคลมปัญหากับร้านค้า" onClose={() => { setShowClaim(false); resetClaim(); }} wide
+          footer={<>
+            <button className="btn btn-ghost btn-sm" onClick={() => { setShowClaim(false); resetClaim(); }}>ยกเลิก</button>
+            <button className="btn btn-primary btn-sm" onClick={handleClaim} disabled={!claim.contact || !claim.detail}>ส่งเรื่องเคลม</button>
+          </>}>
+
+          <div className="alert alert-info" style={{ marginBottom: 16 }}>
+            💬 กรุณาระบุช่องทางติดต่อกลับของคุณ (เช่น LINE ID, เบอร์โทร) ทีมงานจะติดต่อและช่วยประสานงานให้ครับ
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">ช่องทางติดต่อกลับ * <span style={{ fontSize: 11, color: "var(--text3)", fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(LINE ID / เบอร์โทร / อีเมล)</span></label>
+            <input
+              className="input"
+              placeholder="เช่น LINE: @yourlineid หรือ 081-234-5678"
+              value={claim.contact}
+              onChange={e => setClaim(p => ({ ...p, contact: e.target.value }))}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">รายละเอียดปัญหา *</label>
+            <textarea
+              className="input textarea"
+              placeholder="อธิบายปัญหาที่ต้องการเคลม เช่น สั่งของแล้วไม่ได้รับ โอนเงินแล้วร้านไม่ตอบ..."
+              value={claim.detail}
+              onChange={e => setClaim(p => ({ ...p, detail: e.target.value }))}
+            />
+          </div>
+
+          {/* DYNAMIC ATTACHMENTS */}
+          <div className="form-group">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <label className="form-label" style={{ margin: 0 }}>แนบหลักฐานประกอบ</label>
+              <button className="btn btn-ghost btn-sm" onClick={addClaimAtt} style={{ color: "var(--accent)", fontSize: 13 }}>＋ เพิ่มไฟล์</button>
+            </div>
+            {claimAttachments.map((att, idx) => (
+              <div key={att.id} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center", background: "var(--surface2)", padding: "8px 10px", borderRadius: 10, border: "1px solid var(--border)" }}>
+                <span style={{ fontSize: 12, color: "var(--text3)", minWidth: 20, textAlign: "center", fontWeight: 700 }}>{idx + 1}</span>
+                <input
+                  className="input"
+                  placeholder="หัวข้อ เช่น สลิปโอนเงิน, แชทสนทนา"
+                  value={att.topic}
+                  onChange={e => updateClaimAtt(att.id, "topic", e.target.value)}
+                  style={{ flex: 1, padding: "7px 10px", fontSize: 13 }}
+                />
+                <label className={`btn btn-sm ${att.file ? "btn-success" : "btn-outline"}`} style={{ margin: 0, cursor: "pointer", whiteSpace: "nowrap", fontSize: 12 }}>
+                  {att.file ? "✅ เลือกแล้ว" : "📎 เลือกไฟล์"}
+                  <input type="file" style={{ display: "none" }} accept="image/*,.pdf" onChange={e => updateClaimAtt(att.id, "file", e.target.files[0])} />
+                </label>
+                {att.file && <span style={{ fontSize: 11, color: "var(--text3)", maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{att.file.name}</span>}
+                {claimAttachments.length > 1 && (
+                  <button className="btn btn-ghost btn-sm btn-icon" onClick={() => removeClaimAtt(att.id)} style={{ color: "var(--red)", padding: "4px 8px" }}>✕</button>
+                )}
+              </div>
+            ))}
+            <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 6 }}>PNG, JPG, PDF ขนาดไม่เกิน 10MB ต่อไฟล์</div>
           </div>
         </Modal>
       )}
@@ -701,7 +1341,6 @@ const WIZARD_STEPS = ["เลือกขั้น", "ตรวจสอบ", "�
 function UpgradePage({ onNavigate, notify }) {
   const [step, setStep] = useState(0);
   const [targetTier, setTargetTier] = useState(null);
-  const [entityType, setEntityType] = useState("individual");
   const [checks, setChecks] = useState({ fraud_check: null, order_check: null });
   const [files, setFiles] = useState({});
   const [submitted, setSubmitted] = useState(false);
@@ -720,6 +1359,9 @@ function UpgradePage({ onNavigate, notify }) {
     }, 800);
   };
   useEffect(() => { if (step === 1) runChecks(); }, [step]);
+
+  // entity_type ดึงจาก backend (ใช้ mock ไปก่อน — TODO: ดึงจาก api.getMyShop())
+  const entityType = MOCK_MY_SHOP.entity_type;
 
   const getRequiredDocs = () => {
     if (targetTier === 2 && entityType === "individual") return [{ key: "id_card", label: "สำเนาบัตรประชาชน", hint: "ถ่ายภาพให้ชัด ครบ 4 มุม" }];
@@ -741,7 +1383,10 @@ function UpgradePage({ onNavigate, notify }) {
     notify("ส่งคำขอเรียบร้อยแล้ว รอแอดมินตรวจสอบ", "success");
   };
 
-  const tierOptions = [2, 3].filter(t => t > currentTier);
+  // ล็อค: ขั้น 3 ต้องอยู่ขั้น 2 ก่อนเท่านั้น
+  // currentTier=1 → เห็นแค่ขั้น 2 (ขั้น 3 ยังสมัครไม่ได้)
+  // currentTier=2 → เห็นขั้น 3
+  const tierOptions = currentTier === 1 ? [2] : currentTier === 2 ? [3] : [];
 
   return (
     <div className="page">
@@ -783,26 +1428,30 @@ function UpgradePage({ onNavigate, notify }) {
                           <div style={{ width: 20, height: 20, borderRadius: "50%", border: `2px solid ${targetTier === t ? "var(--accent)" : "var(--border2)"}`, background: targetTier === t ? "var(--accent)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{targetTier === t && <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#fff" }} />}</div>
                           <TierBadge tier={t} />
                         </div>
-                        {t === 3 && <span style={{ fontSize: 12, fontWeight: 700, color: "var(--yellow)", background: "#fef9c3", padding: "2px 8px", borderRadius: 100 }}>⚠ ต้องมีประวัติสั่ง</span>}
+                        {t === 3 && <span style={{ fontSize: 12, fontWeight: 700, color: "var(--yellow)", background: "var(--yellow-light)", padding: "2px 8px", borderRadius: 100 }}>⚠ ต้องมีประวัติสั่ง</span>}
                       </div>
                       <p style={{ fontSize: 13, color: "var(--text2)", marginTop: 8, marginLeft: 30 }}>
                         {t === 2 ? "ยืนยันตัวตนด้วยบัตรประชาชน / เอกสารบริษัท" : "ยืนยันสูงสุด ต้องเคยสั่งสินค้าผ่าน myOrder"}
                       </p>
                     </div>
                   ))}
-                </div>
-                {targetTier && (
-                  <>
-                    <div className="form-group">
-                      <label className="form-label">ประเภทผู้ประกอบการ</label>
-                      <div style={{ display: "flex", gap: 10 }}>
-                        {[["individual", "👤 บุคคลธรรมดา"], ["company", "🏢 นิติบุคคล"]].map(([val, lbl]) => (
-                          <button key={val} className={`btn ${entityType === val ? "btn-primary" : "btn-outline"}`} onClick={() => setEntityType(val)}>{lbl}</button>
-                        ))}
+
+                  {/* แสดงขั้น 3 แบบล็อค ถ้าปัจจุบันยังเป็นขั้น 1 */}
+                  {currentTier === 1 && (
+                    <div className="tier-card tier-3" style={{ opacity: 0.45, cursor: "not-allowed", position: "relative" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                          <div style={{ width: 20, height: 20, borderRadius: "50%", border: "2px solid var(--border2)", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 11 }}>🔒</div>
+                          <TierBadge tier={3} />
+                        </div>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--red)", background: "var(--red-light)", padding: "2px 8px", borderRadius: 100, border: "1px solid var(--red)" }}>🔒 ต้องเลื่อนขั้น 2 ก่อน</span>
                       </div>
+                      <p style={{ fontSize: 13, color: "var(--text3)", marginTop: 8, marginLeft: 30 }}>
+                        ต้องผ่านการยืนยันขั้น 2 ก่อนจึงจะสมัครขั้น 3 ได้
+                      </p>
                     </div>
-                  </>
-                )}
+                  )}
+                </div>
                 <div style={{ display: "flex", justifyContent: "flex-end" }}>
                   <button className="btn btn-primary" disabled={!targetTier} onClick={() => setStep(1)}>ถัดไป →</button>
                 </div>
@@ -865,7 +1514,7 @@ function UpgradePage({ onNavigate, notify }) {
                 <div className="dash-card-sub">ตรวจสอบข้อมูลก่อนส่ง</div>
                 <div style={{ marginBottom: 20 }}>
                   <div className="detail-row"><div className="detail-label">ขั้นที่ขอ</div><div className="detail-value"><TierBadge tier={targetTier} /></div></div>
-                  <div className="detail-row"><div className="detail-label">ประเภท</div><div className="detail-value">{entityType === "individual" ? "บุคคลธรรมดา" : "นิติบุคคล"}</div></div>
+                  <div className="detail-row"><div className="detail-label">ประเภท</div><div className="detail-value">{entityType === "individual" ? "👤 บุคคลธรรมดา" : "🏢 นิติบุคคล"} <span style={{fontSize:12,color:"var(--text3)"}}>(ตรวจสอบโดยระบบ)</span></div></div>
                   <div className="detail-row"><div className="detail-label">เอกสาร</div><div className="detail-value">{Object.values(files).map(f => <div key={f.name} style={{ fontSize: 13, color: "var(--green)" }}>✓ {f.name}</div>)}</div></div>
                 </div>
                 <div className="alert alert-warn" style={{ marginBottom: 20 }}>⚠️ เมื่อส่งแล้วจะไม่สามารถแก้ไขเอกสารได้ กรุณาตรวจสอบให้เรียบร้อย</div>
@@ -890,10 +1539,20 @@ export default function App() {
   const [pageData, setPageData] = useState(null);
   const [notification, setNotification] = useState(null);
   const [user, setUser] = useState(() => { try { return JSON.parse(localStorage.getItem("user_data")); } catch { return null; } });
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem("theme") === "dark");
+  // homeKey: เพิ่มทุกครั้งที่กลับหน้าหลัก เพื่อ remount HomePage และ reset search state
+  const [homeKey, setHomeKey] = useState(0);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", darkMode ? "dark" : "light");
+    localStorage.setItem("theme", darkMode ? "dark" : "light");
+  }, [darkMode]);
 
   const notify = (msg, type = "success") => setNotification({ msg, type });
 
   const navigate = (p, data = null) => {
+    // กด "หน้าหลัก" → bump homeKey เพื่อ remount และ reset search
+    if (p === "home") setHomeKey(k => k + 1);
     setPage(p); setPageData(data);
     window.scrollTo(0, 0);
   };
@@ -901,12 +1560,13 @@ export default function App() {
   return (
     <>
       <style>{styles}</style>
-      <Navbar user={user} onNavigate={navigate} page={page} />
-      {page === "home" && <HomePage onNavigate={navigate} />}
+      <Navbar user={user} onNavigate={navigate} darkMode={darkMode} toggleDark={() => setDarkMode(d => !d)} currentPage={page} />
+      {page === "home"        && <HomePage key={homeKey} onNavigate={navigate} />}
+      {page === "shop-list"   && <ShopListPage onNavigate={navigate} />}
       {page === "shop-detail" && pageData && <ShopDetailPage shop={pageData} user={user} onNavigate={navigate} notify={notify} />}
-      {page === "profile" && user && <ProfilePage user={user} onNavigate={navigate} />}
-      {page === "myshop" && <MyShopPage onNavigate={navigate} notify={notify} />}
-      {page === "upgrade" && <UpgradePage onNavigate={navigate} notify={notify} />}
+      {page === "profile"     && user && <ProfilePage user={user} onNavigate={navigate} />}
+      {page === "myshop"      && <MyShopPage onNavigate={navigate} notify={notify} />}
+      {page === "upgrade"     && <UpgradePage onNavigate={navigate} notify={notify} />}
       {notification && <Notification msg={notification.msg} type={notification.type} onClose={() => setNotification(null)} />}
     </>
   );

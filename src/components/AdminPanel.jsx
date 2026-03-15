@@ -70,15 +70,58 @@ const MOCK_BLACKLIST = MOCK_SHOPS.filter(s => s.status === "blacklist").map((s, 
   reason: ["ขายสินค้าไม่ตรงปก", "โกงเงินลูกค้า", "ละเมิดนโยบาย"][i % 3],
 }));
 
-const MOCK_TICKETS = Array.from({ length: 22 }, (_, i) => ({
-  id: `TKT${String(1000 + i).padStart(4, "0")}`,
-  title: ["ร้านค้าโกงเงิน", "ไม่ได้รับสินค้า", "สินค้าไม่ตรงรูป", "ร้านปิดแต่ยังรับออเดอร์"][i % 4],
-  reporter_id: `USR${String(2000 + i).padStart(4, "0")}`,
-  reporter_name: ["สมหญิง ดี", "วิชัย เก่ง", "นภา สุข", "อัมพร ใส"][i % 4],
-  shop_name: `ร้านค้า #${i + 1}`,
-  description: "ผู้ใช้แจ้งว่าทำการสั่งซื้อและโอนเงินแล้ว แต่ร้านค้าไม่ส่งสินค้าให้ และไม่ตอบรับการสื่อสาร มีหลักฐานสลิปการโอนเงินแนบมาด้วย",
-  attachments: i % 2 === 0 ? [{ name: "slip_transfer.jpg", url: "#" }, { name: "chat_screenshot.jpg", url: "#" }] : [],
-  status: ["open", "open", "resolved"][i % 3],
+// MOCK_CLAIMS — คำขอเคลมปัญหาจากฝั่ง User (มี contact + attachments แบบ dynamic topic)
+const MOCK_CLAIMS = [
+  { id: "CLM1000", title: "เคลม: ไม่ได้รับของ",        reporter_id: "USR3000", reporter_name: "มานะ ขยันดี", shop_name: "ร้านหมูกระทะ #7",  description: "สั่งหมูกระทะล่วงหน้าและโอนเงินมัดจำไปแล้ว 500 บาท แต่วันนัดร้านปิดไม่มีการแจ้งเตือน ต้องการขอเงินคืน",   contact: "LINE: @mana_kd / 085-111-2233",            attachments: [{ topic: "สลิปโอนเงินมัดจำ",       name: "deposit_slip.jpg",    url: "#", type: "image" }, { topic: "แชทนัดหมายกับร้าน",   name: "booking_chat.png",    url: "#", type: "image" }],                                                                                                                                                                                  status: "open",     created_at: "07/03/2568" },
+  { id: "CLM1001", title: "เคลม: สินค้าเสียหาย",       reporter_id: "USR3001", reporter_name: "สุดา รักงาน", shop_name: "ร้านคุกกี้ #12",   description: "ได้รับคุกกี้แต่กล่องแตก สินค้าเสียหายทั้งหมด ต้องการให้ร้านส่งใหม่หรือคืนเงิน",                              contact: "LINE: @suda_r หรือ Email: suda@gmail.com", attachments: [{ topic: "รูปกล่องที่เสียหาย",     name: "broken_box.jpg",      url: "#", type: "image" }, { topic: "รูปคุกกี้ที่เสียหาย",  name: "damaged_cookies.jpg", url: "#", type: "image" }, { topic: "ใบเสร็จการสั่งซื้อ", name: "order_receipt.pdf", url: "#", type: "pdf" }], status: "open",     created_at: "08/03/2568" },
+  { id: "CLM1002", title: "เคลม: ได้รับสินค้าผิด",     reporter_id: "USR3002", reporter_name: "ธีรพงษ์ ใฝ่", shop_name: "ร้านขนมไทย #9",   description: "สั่งทองหยิบแต่ได้รับฝอยทอง และปริมาณน้อยกว่าที่ระบุในราคา",                                                    contact: "โทร: 081-999-8877",                        attachments: [{ topic: "สินค้าที่ได้รับจริง",     name: "wrong_item.jpg",      url: "#", type: "image" }, { topic: "สกรีนช็อตรายการสั่ง", name: "order_detail.png",    url: "#", type: "image" }],                                                                                                                                                                                  status: "resolved", created_at: "09/03/2568" },
+  { id: "CLM1003", title: "เคลม: โอนเงินแล้วไม่ตอบ",  reporter_id: "USR3003", reporter_name: "อรุณ ส่อง",   shop_name: "ร้านเค้ก #15",     description: "สั่งเค้กวันเกิดและโอนเงินเต็มจำนวนแล้ว แต่ร้านไม่ตอบแชทมา 5 วัน กังวลว่าจะไม่ได้รับของ",                  contact: "LINE ID: arun_s99",                        attachments: [{ topic: "สลิปโอนเงินเต็มจำนวน",   name: "full_payment.jpg",    url: "#", type: "image" }, { topic: "แชทที่ร้านไม่ตอบ",    name: "no_reply_chat.png",   url: "#", type: "image" }],                                                                                                                                                                                  status: "open",     created_at: "10/03/2568" },
+  { id: "CLM1004", title: "เคลม: ราคาไม่ตรง",          reporter_id: "USR3004", reporter_name: "นงนุช สุข",   shop_name: "ร้านพิซซ่า #22",   description: "ราคาในระบบบอก 250 บาท แต่พอโอนเงินร้านบอก 350 บาท อ้างว่าราคาขึ้นแล้วแต่ไม่ได้แจ้งในระบบ",               contact: "LINE: @nong_s / เบอร์: 090-123-4567",     attachments: [{ topic: "สกรีนราคาในระบบ",         name: "system_price.png",    url: "#", type: "image" }, { topic: "แชทที่ร้านเรียกเพิ่ม", name: "extra_charge.png",    url: "#", type: "image" }, { topic: "สลิปที่โอนไป",        name: "payment_slip.jpg",  url: "#", type: "image" }], status: "open",     created_at: "11/03/2568" },
+  { id: "CLM1005", title: "เคลม: สินค้าหมดอายุ",       reporter_id: "USR3005", reporter_name: "ปิยะ ใจดี",   shop_name: "ร้านขนมครก #3",    description: "ได้รับขนมครกที่หมดอายุแล้ว แพ็กเกจระบุหมดอายุเดือนที่แล้ว ต้องการเงินคืนหรือสินค้าใหม่",                   contact: "LINE: @piya42",                            attachments: [{ topic: "รูปวันหมดอายุบนสินค้า",  name: "expired_label.jpg",   url: "#", type: "image" }],                                                                                                                                                                                                                                                                               status: "open",     created_at: "12/03/2568" },
+  { id: "CLM1006", title: "เคลม: ส่งของไม่ครบ",        reporter_id: "USR3006", reporter_name: "สมชาย แก้ว",  shop_name: "ร้านบราวนี่ #23",  description: "สั่งบราวนี่ 10 ชิ้น แต่ได้รับแค่ 7 ชิ้น ราคาจ่ายเต็ม ต้องการส่วนที่ขาด",                                   contact: "โทร: 082-555-6677",                        attachments: [{ topic: "ใบเสร็จยืนยันรายการ",    name: "order_confirm.pdf",   url: "#", type: "pdf"   }, { topic: "รูปของที่ได้รับจริง",  name: "received_items.jpg",  url: "#", type: "image" }],                                                                                                                                                                                  status: "resolved", created_at: "13/03/2568" },
+  { id: "CLM1007", title: "เคลม: ร้านยกเลิกออเดอร์",  reporter_id: "USR3007", reporter_name: "วิชัย เก่ง",  shop_name: "ร้านกาแฟ #8",     description: "ร้านยกเลิกออเดอร์ฝ่ายเดียวโดยไม่แจ้งล่วงหน้า โอนเงินไปแล้ว 280 บาท ยังไม่ได้รับเงินคืน",               contact: "LINE: @vichai_k",                          attachments: [{ topic: "สลิปโอนเงิน",             name: "payment_slip.jpg",    url: "#", type: "image" }, { topic: "แชทยกเลิกออเดอร์",    name: "cancel_chat.png",     url: "#", type: "image" }],                                                                                                                                                                                  status: "open",     created_at: "14/03/2568" },
+];
+
+// MOCK REPORTS — รายงานร้านค้าจากฝั่ง User พร้อม dynamic attachments
+const REPORT_REASONS = ["โกงเงิน / ไม่ส่งของ", "สินค้าไม่ตรงรูป", "ร้านค้าปลอม", "ข้อมูลร้านค้าผิด", "อื่นๆ"];
+const MOCK_REPORTS = Array.from({ length: 18 }, (_, i) => ({
+  id: `RPT${String(1000 + i).padStart(4, "0")}`,
+  shop_id: (i % 10) + 1,
+  shop_name: ["ร้านข้าวมันไก่สมชาย","ก๋วยเตี๋ยวเรือป้าแดง","ขนมครกบ้านนา","ส้มตำอีสานแม่ตุ๋ย","ชานมไข่มุกไต้หวันแท้","ปาท่องโก๋กรอบน้อย","ร้านหมูกระทะ","กาแฟดริปคั่วสด","ขนมไทยโบราณ","ข้าวหน้าเป็ด"][i % 10],
+  reporter_id: `USR${String(3000 + i).padStart(4, "0")}`,
+  reporter_name: ["สมชาย แก้ว","ปิยะ ใจดี","นภา สวย","วิชัย เก่ง","แสงดาว มี","ประเสริฐ ดี","สุดา รัก","ธีรพงษ์ ใฝ่","มานะ ขยัน","อรุณ ส่อง"][i % 10],
+  reason: REPORT_REASONS[i % 5],
+  detail: [
+    "โอนเงินไปแล้ว 500 บาท แต่ร้านไม่ส่งของมาเลย ติดต่อกลับก็ไม่รับ ทำอยู่หลายวันแล้ว",
+    "รูปในโปรไฟล์กับของที่ส่งมาไม่ตรงกัน สินค้าคุณภาพต่ำกว่าที่โฆษณาไว้มาก",
+    "สงสัยว่าเป็นร้านปลอม เบอร์โทรไม่มีจริง ที่อยู่ก็ไม่ตรง",
+    "ข้อมูลราคาในโปรไฟล์กับที่เรียกเก็บจริงต่างกัน ไม่แจ้งล่วงหน้า",
+    "ร้านส่งสินค้าผิดชนิด แจ้งขอเปลี่ยนแต่ถูกปฏิเสธ",
+  ][i % 5],
+  attachments: [
+    [
+      {"topic": "สลิปโอนเงิน", "filename": "slip_transfer.jpg", "url": "#", "type": "image"},
+      {"topic": "แชทสนทนากับร้าน", "filename": "chat_screenshot.png", "url": "#", "type": "image"},
+    ],
+    [
+      {"topic": "รูปสินค้าที่ได้รับ", "filename": "product_received.jpg", "url": "#", "type": "image"},
+      {"topic": "รูปโฆษณาในร้าน", "filename": "product_advertised.jpg", "url": "#", "type": "image"},
+      {"topic": "ใบเสร็จ", "filename": "receipt.pdf", "url": "#", "type": "pdf"},
+    ],
+    [
+      {"topic": "หลักฐานตำแหน่งปลอม", "filename": "fake_location.jpg", "url": "#", "type": "image"},
+    ],
+    [
+      {"topic": "สกรีนช็อตราคาเดิม", "filename": "price_old.png", "url": "#", "type": "image"},
+      {"topic": "ใบเสร็จที่ถูกเรียกเก็บ", "filename": "receipt_actual.pdf", "url": "#", "type": "pdf"},
+    ],
+    [
+      {"topic": "รูปสินค้าที่ส่งมาผิด", "filename": "wrong_item.jpg", "url": "#", "type": "image"},
+      {"topic": "แชทปฏิเสธการเปลี่ยน", "filename": "reject_chat.png", "url": "#", "type": "image"},
+      {"topic": "ออเดอร์ต้นฉบับ", "filename": "original_order.pdf", "url": "#", "type": "pdf"},
+    ],
+  ][i % 5],
+  status: ["pending","pending","pending","resolved","dismissed"][i % 5],
   created_at: new Date(2025, 2, i + 1).toLocaleDateString("th-TH"),
 }));
 
@@ -449,7 +492,7 @@ function AllShopsPage({ notify }) {
           { label: "ร้านค้าทั้งหมด", val: shops.filter(s=>s.status!=="deleted").length, color: "var(--accent)" },
           { label: "ร้านค้า Verified", val: shops.filter(s=>s.verified && s.status!=="deleted").length, color: "var(--green)" },
           { label: "Blacklist", val: shops.filter(s=>s.status==="blacklist").length, color: "var(--red)" },
-          { label: "ถูกลบ", val: shops.filter(s=>s.status==="deleted").length, color: "var(--text3)" },
+          { label: "ทั่วไป (ไม่ Verified)", val: shops.filter(s=>s.status==="active" && !s.verified).length, color: "var(--text3)" },
         ].map(s => (
           <div className="stat-card" key={s.label} style={{ "--accent-color": s.color }}>
             <div className="stat-label">{s.label}</div>
@@ -649,20 +692,184 @@ function BlacklistPage() {
   );
 }
 
-// --- TICKETS ---
-function TicketsPage() {
-  const [page, setPage] = useState(1);
+// --- CLAIMS ---
+function ClaimsPage() {
+  const [page, setPage]         = useState(1);
   const [selected, setSelected] = useState(null);
-  const { items, totalPages } = paginate(MOCK_TICKETS, page);
+  const [claims, setClaims]     = useState(MOCK_CLAIMS);
 
-  const statusBadge = (s) => s === "open" ? <span className="badge badge-yellow">🔓 เปิด</span> : <span className="badge badge-gray">✓ แก้ไขแล้ว</span>;
+  const { items, totalPages } = paginate(claims, page);
+
+  const handleResolve = (id) => {
+    // TODO: await api.resolveClaim(id)
+    setClaims(prev => prev.map(c => c.id === id ? { ...c, status: "resolved" } : c));
+    setSelected(null);
+  };
+
+  const statusBadge = (s) => s === "open"
+    ? <span className="badge badge-yellow">⏳ รอดำเนินการ</span>
+    : <span className="badge badge-green">✓ แก้ไขแล้ว</span>;
 
   return (
     <div>
-      <div className="stats-row" style={{ gridTemplateColumns: "repeat(2,1fr)" }}>
+      {/* STATS */}
+      <div className="stats-row" style={{ gridTemplateColumns: "repeat(3,1fr)" }}>
         {[
-          { label: "คำร้องทั้งหมด", val: MOCK_TICKETS.length, color: "var(--accent)" },
-          { label: "รอดำเนินการ", val: MOCK_TICKETS.filter(t=>t.status==="open").length, color: "var(--yellow)" },
+          { label: "เคลมทั้งหมด",   val: claims.length,                                      color: "var(--accent)" },
+          { label: "รอดำเนินการ",   val: claims.filter(c => c.status === "open").length,     color: "var(--yellow)" },
+          { label: "แก้ไขแล้ว",     val: claims.filter(c => c.status === "resolved").length, color: "var(--green)" },
+        ].map(s => (
+          <div className="stat-card" key={s.label} style={{ "--accent-color": s.color }}>
+            <div className="stat-label">{s.label}</div>
+            <div className="stat-value">{s.val}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* TABLE */}
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Claim ID</th>
+              <th>หัวข้อ</th>
+              <th>ร้านที่เกี่ยวข้อง</th>
+              <th>ผู้เคลม</th>
+              <th>ช่องทางติดต่อ</th>
+              <th>ไฟล์</th>
+              <th>วันที่</th>
+              <th>สถานะ</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.length === 0
+              ? <tr><td colSpan={9}><div className="empty-state"><div className="icon">📭</div><p>ไม่มีคำขอเคลม</p></div></td></tr>
+              : items.map(c => (
+              <tr key={c.id}>
+                <td><span className="tag badge badge-blue" style={{ fontFamily: "var(--mono)", fontSize: 11 }}>{c.id}</span></td>
+                <td><strong style={{ fontSize: 13 }}>{c.title}</strong></td>
+                <td style={{ color: "var(--text2)", fontSize: 13 }}>{c.shop_name}</td>
+                <td>
+                  <div style={{ fontSize: 13 }}>{c.reporter_name}</div>
+                  <div style={{ fontSize: 11, color: "var(--text3)", fontFamily: "var(--mono)" }}>{c.reporter_id}</div>
+                </td>
+                <td style={{ fontSize: 12, color: "var(--text2)", maxWidth: 160 }}>
+                  <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.contact}</span>
+                </td>
+                <td style={{ fontSize: 12, color: "var(--text2)" }}>
+                  {c.attachments.length > 0 ? `${c.attachments.length} ไฟล์` : <span style={{ color: "var(--text3)" }}>—</span>}
+                </td>
+                <td style={{ color: "var(--text3)", fontSize: 12 }}>{c.created_at}</td>
+                <td>{statusBadge(c.status)}</td>
+                <td><button className="btn btn-ghost btn-sm" onClick={() => setSelected(c)}>จัดการ</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {totalPages > 1 && <Pagination page={page} totalPages={totalPages} onChange={setPage} />}
+
+      {/* MODAL */}
+      {selected && (
+        <Modal title={`⚖️ เคลม: ${selected.id}`} onClose={() => setSelected(null)} wide
+          footer={<>
+            <button className="btn btn-ghost btn-sm" onClick={() => setSelected(null)}>ปิด</button>
+            {selected.status === "open" && (
+              <button className="btn btn-success btn-sm" onClick={() => handleResolve(selected.id)}>✓ ดำเนินการแล้ว</button>
+            )}
+          </>}>
+
+          <div className="alert alert-info" style={{ marginBottom: 16 }}>
+            ⚖️ คำขอเคลมปัญหา — ผู้ใช้ต้องการให้ทีมงานติดต่อกลับและช่วยประสานงาน
+          </div>
+
+          <div className="section-title">ข้อมูลคำขอเคลม</div>
+          {[
+            ["Claim ID",         selected.id],
+            ["หัวข้อ",            selected.title],
+            ["ร้านที่เกี่ยวข้อง", selected.shop_name],
+            ["ผู้เคลม",           `${selected.reporter_name} (${selected.reporter_id})`],
+            ["วันที่",            selected.created_at],
+            ["สถานะ",             selected.status === "open" ? "รอดำเนินการ" : "แก้ไขแล้ว"],
+          ].map(([l, v]) => (
+            <div className="detail-row" key={l}><div className="detail-label">{l}</div><div className="detail-value">{v}</div></div>
+          ))}
+
+          {/* CONTACT */}
+          <div className="section-title" style={{ marginTop: 20 }}>📞 ช่องทางติดต่อกลับ</div>
+          <div style={{ background: "rgba(37,99,235,0.06)", border: "1px solid rgba(37,99,235,0.15)", borderRadius: 10, padding: "12px 16px", fontSize: 14, fontWeight: 600, color: "var(--text)" }}>
+            {selected.contact}
+          </div>
+
+          {/* DESCRIPTION */}
+          <div className="section-title" style={{ marginTop: 20 }}>รายละเอียดปัญหา</div>
+          <div style={{ background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 8, padding: 14, fontSize: 13.5, lineHeight: 1.7, color: "var(--text2)" }}>
+            {selected.description}
+          </div>
+
+          {/* ATTACHMENTS */}
+          {selected.attachments.length > 0 && (
+            <>
+              <div className="section-title" style={{ marginTop: 20 }}>
+                ไฟล์แนบหลักฐาน
+                <span style={{ fontWeight: 400, color: "var(--text3)", marginLeft: 8, fontSize: 12, textTransform: "none", letterSpacing: 0 }}>
+                  ({selected.attachments.length} ไฟล์)
+                </span>
+              </div>
+              {selected.attachments.map((att, idx) => (
+                <div key={idx} className="doc-item" style={{ marginBottom: 8 }}>
+                  <span className="doc-icon">{att.type === "pdf" ? "📄" : "🖼️"}</span>
+                  <div style={{ flex: 1 }}>
+                    {att.topic && <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 2 }}>{att.topic}</div>}
+                    <div style={{ fontSize: att.topic ? 11 : 13, color: "var(--text3)" }}>{att.name || att.filename}</div>
+                  </div>
+                  <a href={att.url} className="btn btn-ghost btn-sm" target="_blank" rel="noreferrer">⬇ ดาวน์โหลด</a>
+                </div>
+              ))}
+            </>
+          )}
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// --- REPORTS ---
+function ReportsPage({ notify }) {
+  const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState(null);
+  const [reports, setReports] = useState(MOCK_REPORTS);
+  const { items, totalPages } = paginate(reports, page);
+
+  const handleResolve = (id) => {
+    // TODO: await api.resolveReport(id)
+    setReports(prev => prev.map(r => r.id === id ? { ...r, status: "resolved" } : r));
+    setSelected(null);
+    notify("ดำเนินการเรียบร้อยแล้ว", "success");
+  };
+  const handleDismiss = (id) => {
+    // TODO: await api.dismissReport(id)
+    setReports(prev => prev.map(r => r.id === id ? { ...r, status: "dismissed" } : r));
+    setSelected(null);
+    notify("ปิดรายงานเรียบร้อยแล้ว", "success");
+  };
+
+  const statusBadge = (s) => {
+    if (s === "pending")   return <span className="badge badge-yellow">⏳ รอตรวจสอบ</span>;
+    if (s === "resolved")  return <span className="badge badge-green">✓ แก้ไขแล้ว</span>;
+    return <span className="badge badge-gray">— ปิดแล้ว</span>;
+  };
+
+  const fileIcon = (type) => type === "pdf" ? "📄" : "🖼️";
+
+  return (
+    <div>
+      <div className="stats-row" style={{ gridTemplateColumns: "repeat(3,1fr)" }}>
+        {[
+          { label: "รายงานทั้งหมด",  val: reports.length,                                    color: "var(--accent)" },
+          { label: "รอตรวจสอบ",      val: reports.filter(r=>r.status==="pending").length,    color: "var(--yellow)" },
+          { label: "แก้ไขแล้ว",      val: reports.filter(r=>r.status==="resolved").length,   color: "var(--green)" },
         ].map(s => (
           <div className="stat-card" key={s.label} style={{ "--accent-color": s.color }}>
             <div className="stat-label">{s.label}</div>
@@ -673,20 +880,38 @@ function TicketsPage() {
 
       <div className="table-wrap">
         <table>
-          <thead><tr><th>Ticket ID</th><th>หัวข้อ</th><th>ร้านที่เกี่ยวข้อง</th><th>ผู้ร้องเรียน</th><th>วันที่</th><th>สถานะ</th><th></th></tr></thead>
+          <thead>
+            <tr>
+              <th>Report ID</th>
+              <th>ร้านที่ถูกรายงาน</th>
+              <th>ประเภท</th>
+              <th>ผู้รายงาน</th>
+              <th>ไฟล์แนบ</th>
+              <th>วันที่</th>
+              <th>สถานะ</th>
+              <th></th>
+            </tr>
+          </thead>
           <tbody>
-            {items.map(t => (
-              <tr key={t.id}>
-                <td><span className="tag badge badge-blue" style={{ fontFamily: "var(--mono)", fontSize: 11 }}>{t.id}</span></td>
-                <td><strong>{t.title}</strong></td>
-                <td style={{ color: "var(--text2)" }}>{t.shop_name}</td>
+            {items.length === 0 ? (
+              <tr><td colSpan={8}><div className="empty-state"><div className="icon">🎉</div><p>ไม่มีรายงาน</p></div></td></tr>
+            ) : items.map(r => (
+              <tr key={r.id}>
+                <td><span className="tag badge badge-blue" style={{ fontFamily: "var(--mono)", fontSize: 11 }}>{r.id}</span></td>
+                <td><strong>{r.shop_name}</strong></td>
+                <td><span className="badge badge-red" style={{ fontSize: 11 }}>{r.reason}</span></td>
                 <td>
-                  <div style={{ fontSize: 13 }}>{t.reporter_name}</div>
-                  <div style={{ fontSize: 11, color: "var(--text3)", fontFamily: "var(--mono)" }}>{t.reporter_id}</div>
+                  <div style={{ fontSize: 13 }}>{r.reporter_name}</div>
+                  <div style={{ fontSize: 11, color: "var(--text3)", fontFamily: "var(--mono)" }}>{r.reporter_id}</div>
                 </td>
-                <td style={{ color: "var(--text3)", fontSize: 12 }}>{t.created_at}</td>
-                <td>{statusBadge(t.status)}</td>
-                <td><button className="btn btn-ghost btn-sm" onClick={() => setSelected(t)}>จัดการ</button></td>
+                <td>
+                  <span style={{ fontSize: 12, color: "var(--text2)" }}>
+                    {r.attachments.length > 0 ? `${r.attachments.length} ไฟล์` : <span style={{ color: "var(--text3)" }}>—</span>}
+                  </span>
+                </td>
+                <td style={{ color: "var(--text3)", fontSize: 12 }}>{r.created_at}</td>
+                <td>{statusBadge(r.status)}</td>
+                <td><button className="btn btn-ghost btn-sm" onClick={() => setSelected(r)}>จัดการ</button></td>
               </tr>
             ))}
           </tbody>
@@ -695,26 +920,55 @@ function TicketsPage() {
       {totalPages > 1 && <Pagination page={page} totalPages={totalPages} onChange={setPage} />}
 
       {selected && (
-        <Modal title={`Ticket: ${selected.id}`} onClose={() => setSelected(null)} wide
-          footer={<button className="btn btn-ghost btn-sm" onClick={() => setSelected(null)}>ปิด</button>}>
-          <div className="section-title">รายละเอียดคำร้อง</div>
-          {[["Ticket ID", selected.id], ["หัวข้อ", selected.title], ["ร้านที่เกี่ยวข้อง", selected.shop_name], ["ผู้ร้องเรียน", `${selected.reporter_name} (${selected.reporter_id})`], ["วันที่", selected.created_at], ["สถานะ", selected.status === "open" ? "เปิด" : "แก้ไขแล้ว"]].map(([l, v]) => (
+        <Modal title={`รายงาน: ${selected.id}`} onClose={() => setSelected(null)} wide
+          footer={<>
+            <button className="btn btn-ghost btn-sm" onClick={() => setSelected(null)}>ปิด</button>
+            {selected.status === "pending" && <>
+              <button className="btn btn-warn btn-sm" onClick={() => handleDismiss(selected.id)}>— ปิดรายงาน</button>
+              <button className="btn btn-success btn-sm" onClick={() => handleResolve(selected.id)}>✓ ดำเนินการแล้ว</button>
+            </>}
+          </>}>
+
+          {/* INFO */}
+          <div className="section-title">ข้อมูลรายงาน</div>
+          {[
+            ["Report ID",       selected.id],
+            ["ร้านที่ถูกรายงาน", selected.shop_name],
+            ["ประเภท",           selected.reason],
+            ["ผู้รายงาน",        `${selected.reporter_name} (${selected.reporter_id})`],
+            ["วันที่",           selected.created_at],
+            ["สถานะ",            selected.status === "pending" ? "รอตรวจสอบ" : selected.status === "resolved" ? "แก้ไขแล้ว" : "ปิดแล้ว"],
+          ].map(([l, v]) => (
             <div className="detail-row" key={l}><div className="detail-label">{l}</div><div className="detail-value">{v}</div></div>
           ))}
+
+          {/* DETAIL */}
           <div className="section-title" style={{ marginTop: 20 }}>รายละเอียดปัญหา</div>
-          <div style={{ background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 8, padding: 14, fontSize: 13.5, lineHeight: 1.7, color: "var(--text2)" }}>
-            {selected.description}
+          <div style={{ background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 8, padding: 14, fontSize: 13.5, lineHeight: 1.7, color: "var(--text2)", marginBottom: 20 }}>
+            {selected.detail}
           </div>
-          {selected.attachments.length > 0 && <>
-            <div className="section-title" style={{ marginTop: 20 }}>ไฟล์แนบ ({selected.attachments.length})</div>
-            {selected.attachments.map(f => (
-              <div className="doc-item" key={f.name}>
-                <span className="doc-icon">{f.name.endsWith(".jpg") ? "🖼️" : "📄"}</span>
-                <span className="doc-name">{f.name}</span>
-                <a href={f.url} className="btn btn-ghost btn-sm" target="_blank" rel="noreferrer">⬇ ดาวน์โหลด</a>
+
+          {/* DYNAMIC ATTACHMENTS */}
+          <div className="section-title">
+            ไฟล์แนบหลักฐาน
+            <span style={{ fontWeight: 400, color: "var(--text3)", marginLeft: 8, fontSize: 12, textTransform: "none", letterSpacing: 0 }}>
+              ({selected.attachments.length} ไฟล์)
+            </span>
+          </div>
+          {selected.attachments.length === 0 ? (
+            <p style={{ fontSize: 13, color: "var(--text3)" }}>ไม่มีไฟล์แนบ</p>
+          ) : (
+            selected.attachments.map((att, idx) => (
+              <div key={idx} className="doc-item" style={{ marginBottom: 8 }}>
+                <span className="doc-icon">{fileIcon(att.type)}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{att.topic}</div>
+                  <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 2 }}>{att.filename}</div>
+                </div>
+                <a href={att.url} className="btn btn-ghost btn-sm" target="_blank" rel="noreferrer">⬇ ดาวน์โหลด</a>
               </div>
-            ))}
-          </>}
+            ))
+          )}
         </Modal>
       )}
     </div>
@@ -725,10 +979,11 @@ function TicketsPage() {
 // APP SHELL
 // ============================================================
 const PAGES = [
-  { id: "shops", label: "ร้านค้าทั้งหมด", icon: "🏪", title: "ร้านค้าทั้งหมด", sub: "All Shops Management" },
-  { id: "upgrades", label: "คำขอเลื่อนขั้น", icon: "⬆️", title: "คำขอ Verified", sub: "Upgrade Requests" },
-  { id: "blacklist", label: "Blacklist", icon: "⛔", title: "ร้านค้า Blacklist", sub: "Blacklisted Shops" },
-  { id: "tickets", label: "Support Tickets", icon: "🎫", title: "คำร้องขอความช่วยเหลือ", sub: "Support Tickets" },
+  { id: "shops",    label: "ร้านค้าทั้งหมด",   icon: "🏪", title: "ร้านค้าทั้งหมด",           sub: "All Shops Management" },
+  { id: "upgrades", label: "คำขอเลื่อนขั้น",   icon: "⬆️", title: "คำขอ Verified",             sub: "Upgrade Requests" },
+  { id: "reports",  label: "รายงานร้านค้า",     icon: "🚩", title: "รายงานร้านค้า",             sub: "Shop Reports" },
+  { id: "blacklist",label: "Blacklist",         icon: "⛔", title: "ร้านค้า Blacklist",          sub: "Blacklisted Shops" },
+  { id: "claims",   label: "เคลมปัญหา",         icon: "⚖️", title: "คำขอเคลมปัญหา",              sub: "Claims" },
 ];
 
 export default function App() {
@@ -779,10 +1034,11 @@ export default function App() {
             </div>
           </div>
           <div className="content">
-            {activePage === "shops" && <AllShopsPage notify={notify} />}
+            {activePage === "shops"    && <AllShopsPage notify={notify} />}
             {activePage === "upgrades" && <UpgradeRequestsPage notify={notify} />}
-            {activePage === "blacklist" && <BlacklistPage />}
-            {activePage === "tickets" && <TicketsPage />}
+            {activePage === "reports"  && <ReportsPage notify={notify} />}
+            {activePage === "blacklist"&& <BlacklistPage />}
+            {activePage === "claims"   && <ClaimsPage />}
           </div>
         </main>
       </div>
