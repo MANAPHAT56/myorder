@@ -1,410 +1,211 @@
 import { useState, useEffect } from "react";
 
 // ============================================================
-// API CONFIG — เปลี่ยน BASE_URL เป็น PHP server ของคุณ
+// ADMIN PANEL — ครอบคลุม UC1-UC11
+// UC1:  แก้ไขรายละเอียดร้านค้า
+// UC2:  จัดการคำร้องรายงาน
+// UC3:  เพิ่มร้านค้า
+// UC4:  ลบร้านค้า
+// UC5:  เพิ่ม Blacklist
+// UC6:  จัดการร้านค้า (hub)
+// UC7:  ดูรายการร้านค้า Blacklist
+// UC8:  ค้นหาร้านค้า
+// UC9:  จัดการเลื่อนขั้นที่ 3 ให้ร้านค้า
+// UC10: จัดการคำร้องร้านค้าที่ขอเลื่อนขั้น
+// UC11: จัดการคำร้องขอเคลม
 // ============================================================
-const API_BASE = "https://your-php-server.com/api";
 
-const api = {
-  // Auth
-  loginWithGoogle: (token) => fetch(`${API_BASE}/auth/google`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }) }).then(r => r.json()),
-
-  // Shops
-  getShops: (page = 1, search = "") => fetch(`${API_BASE}/shops?page=${page}&search=${encodeURIComponent(search)}`, { headers: authHeaders() }).then(r => r.json()),
-  addShop: (data) => fetch(`${API_BASE}/shops`, { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(data) }).then(r => r.json()),
-  deleteShop: (id) => fetch(`${API_BASE}/shops/${id}`, { method: "DELETE", headers: authHeaders() }).then(r => r.json()),
-  blacklistShop: (id) => fetch(`${API_BASE}/shops/${id}/blacklist`, { method: "PATCH", headers: authHeaders() }).then(r => r.json()),
-
-  // Upgrade Requests
-  getUpgradeRequests: (page = 1) => fetch(`${API_BASE}/upgrade-requests?page=${page}`, { headers: authHeaders() }).then(r => r.json()),
-  approveUpgrade: (id) => fetch(`${API_BASE}/upgrade-requests/${id}/approve`, { method: "PATCH", headers: authHeaders() }).then(r => r.json()),
-  rejectUpgrade: (id, reason) => fetch(`${API_BASE}/upgrade-requests/${id}/reject`, { method: "PATCH", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify({ reason }) }).then(r => r.json()),
-
-  // Blacklist
-  getBlacklist: (page = 1) => fetch(`${API_BASE}/shops/blacklist?page=${page}`, { headers: authHeaders() }).then(r => r.json()),
-
-  // Tickets
-  getTickets: (page = 1) => fetch(`${API_BASE}/tickets?page=${page}`, { headers: authHeaders() }).then(r => r.json()),
-};
-
-const authHeaders = () => {
-  const token = localStorage.getItem("admin_token");
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
+const ITEMS_PER_PAGE = 8;
+const INVALID_CHARS  = /[^\u0E00-\u0E7Fa-zA-Z0-9\s\-_.@/:,()]/;
 
 // ============================================================
 // MOCK DATA
 // ============================================================
-const MOCK_SHOPS = Array.from({ length: 47 }, (_, i) => ({
-  id: i + 1,
-  name: ["ร้านข้าวมันไก่สมชาย", "ก๋วยเตี๋ยวเรือป้าแดง", "ขนมครกบ้านนา", "ผัดไทยอร่อยดี", "ส้มตำอีสาน"][i % 5] + ` #${i + 1}`,
-  owner_name: ["สมชาย มีสุข", "วิไล ดีงาม", "ประเสริฐ ใจดี", "นงนุช สุขใส", "อภิชาต เก่งกาจ"][i % 5],
-  user_id: `USR${String(1000 + i).padStart(4, "0")}`,
-  category: ["อาหาร", "ขนม", "เครื่องดื่ม"][i % 3],
-  status: i % 11 === 0 ? "blacklist" : i % 13 === 0 ? "deleted" : "active",
-  verified: i % 3 === 0,
-  created_at: new Date(2024, i % 12, (i % 28) + 1).toLocaleDateString("th-TH"),
-  address: `${i + 1} ถ.สุขุมวิท แขวงคลองเตย กรุงเทพฯ`,
-  phone: `08${String(i).padStart(8, "0")}`,
-  rating: (3.5 + (i % 15) * 0.1).toFixed(1),
-  orders_count: Math.floor(Math.random() * 500) + 10,
-}));
-
-const MOCK_UPGRADE_REQUESTS = Array.from({ length: 15 }, (_, i) => ({
-  id: i + 1,
-  shop_name: `ร้านค้า Premium #${i + 1}`,
-  shop_id: i + 10,
-  owner_name: ["มานะ ขยันดี", "สุดา รักงาน", "ธีรพงษ์ ใฝ่เรียน"][i % 3],
-  submitted_at: new Date(2025, 2, 10 + i).toLocaleDateString("th-TH"),
-  documents: [
-    { name: "สำเนาบัตรประชาชน.pdf", url: "#" },
-    { name: "ทะเบียนพาณิชย์.pdf", url: "#" },
-  ],
-  reject_rounds: i % 4 === 0 ? 1 : 0,
-  status: "pending",
-}));
-
-const MOCK_BLACKLIST = MOCK_SHOPS.filter(s => s.status === "blacklist").map((s, i) => ({
-  ...s,
-  blacklisted_at: new Date(2025, i % 12, i + 1).toLocaleDateString("th-TH"),
-  reason: ["ขายสินค้าไม่ตรงปก", "โกงเงินลูกค้า", "ละเมิดนโยบาย"][i % 3],
-}));
-
-// MOCK_CLAIMS — คำขอเคลมปัญหาจากฝั่ง User (มี contact + attachments แบบ dynamic topic)
-const MOCK_CLAIMS = [
-  { id: "CLM1000", title: "เคลม: ไม่ได้รับของ",        reporter_id: "USR3000", reporter_name: "มานะ ขยันดี", shop_name: "ร้านหมูกระทะ #7",  description: "สั่งหมูกระทะล่วงหน้าและโอนเงินมัดจำไปแล้ว 500 บาท แต่วันนัดร้านปิดไม่มีการแจ้งเตือน ต้องการขอเงินคืน",   contact: "LINE: @mana_kd / 085-111-2233",            attachments: [{ topic: "สลิปโอนเงินมัดจำ",       name: "deposit_slip.jpg",    url: "#", type: "image" }, { topic: "แชทนัดหมายกับร้าน",   name: "booking_chat.png",    url: "#", type: "image" }],                                                                                                                                                                                  status: "open",     created_at: "07/03/2568" },
-  { id: "CLM1001", title: "เคลม: สินค้าเสียหาย",       reporter_id: "USR3001", reporter_name: "สุดา รักงาน", shop_name: "ร้านคุกกี้ #12",   description: "ได้รับคุกกี้แต่กล่องแตก สินค้าเสียหายทั้งหมด ต้องการให้ร้านส่งใหม่หรือคืนเงิน",                              contact: "LINE: @suda_r หรือ Email: suda@gmail.com", attachments: [{ topic: "รูปกล่องที่เสียหาย",     name: "broken_box.jpg",      url: "#", type: "image" }, { topic: "รูปคุกกี้ที่เสียหาย",  name: "damaged_cookies.jpg", url: "#", type: "image" }, { topic: "ใบเสร็จการสั่งซื้อ", name: "order_receipt.pdf", url: "#", type: "pdf" }], status: "open",     created_at: "08/03/2568" },
-  { id: "CLM1002", title: "เคลม: ได้รับสินค้าผิด",     reporter_id: "USR3002", reporter_name: "ธีรพงษ์ ใฝ่", shop_name: "ร้านขนมไทย #9",   description: "สั่งทองหยิบแต่ได้รับฝอยทอง และปริมาณน้อยกว่าที่ระบุในราคา",                                                    contact: "โทร: 081-999-8877",                        attachments: [{ topic: "สินค้าที่ได้รับจริง",     name: "wrong_item.jpg",      url: "#", type: "image" }, { topic: "สกรีนช็อตรายการสั่ง", name: "order_detail.png",    url: "#", type: "image" }],                                                                                                                                                                                  status: "resolved", created_at: "09/03/2568" },
-  { id: "CLM1003", title: "เคลม: โอนเงินแล้วไม่ตอบ",  reporter_id: "USR3003", reporter_name: "อรุณ ส่อง",   shop_name: "ร้านเค้ก #15",     description: "สั่งเค้กวันเกิดและโอนเงินเต็มจำนวนแล้ว แต่ร้านไม่ตอบแชทมา 5 วัน กังวลว่าจะไม่ได้รับของ",                  contact: "LINE ID: arun_s99",                        attachments: [{ topic: "สลิปโอนเงินเต็มจำนวน",   name: "full_payment.jpg",    url: "#", type: "image" }, { topic: "แชทที่ร้านไม่ตอบ",    name: "no_reply_chat.png",   url: "#", type: "image" }],                                                                                                                                                                                  status: "open",     created_at: "10/03/2568" },
-  { id: "CLM1004", title: "เคลม: ราคาไม่ตรง",          reporter_id: "USR3004", reporter_name: "นงนุช สุข",   shop_name: "ร้านพิซซ่า #22",   description: "ราคาในระบบบอก 250 บาท แต่พอโอนเงินร้านบอก 350 บาท อ้างว่าราคาขึ้นแล้วแต่ไม่ได้แจ้งในระบบ",               contact: "LINE: @nong_s / เบอร์: 090-123-4567",     attachments: [{ topic: "สกรีนราคาในระบบ",         name: "system_price.png",    url: "#", type: "image" }, { topic: "แชทที่ร้านเรียกเพิ่ม", name: "extra_charge.png",    url: "#", type: "image" }, { topic: "สลิปที่โอนไป",        name: "payment_slip.jpg",  url: "#", type: "image" }], status: "open",     created_at: "11/03/2568" },
-  { id: "CLM1005", title: "เคลม: สินค้าหมดอายุ",       reporter_id: "USR3005", reporter_name: "ปิยะ ใจดี",   shop_name: "ร้านขนมครก #3",    description: "ได้รับขนมครกที่หมดอายุแล้ว แพ็กเกจระบุหมดอายุเดือนที่แล้ว ต้องการเงินคืนหรือสินค้าใหม่",                   contact: "LINE: @piya42",                            attachments: [{ topic: "รูปวันหมดอายุบนสินค้า",  name: "expired_label.jpg",   url: "#", type: "image" }],                                                                                                                                                                                                                                                                               status: "open",     created_at: "12/03/2568" },
-  { id: "CLM1006", title: "เคลม: ส่งของไม่ครบ",        reporter_id: "USR3006", reporter_name: "สมชาย แก้ว",  shop_name: "ร้านบราวนี่ #23",  description: "สั่งบราวนี่ 10 ชิ้น แต่ได้รับแค่ 7 ชิ้น ราคาจ่ายเต็ม ต้องการส่วนที่ขาด",                                   contact: "โทร: 082-555-6677",                        attachments: [{ topic: "ใบเสร็จยืนยันรายการ",    name: "order_confirm.pdf",   url: "#", type: "pdf"   }, { topic: "รูปของที่ได้รับจริง",  name: "received_items.jpg",  url: "#", type: "image" }],                                                                                                                                                                                  status: "resolved", created_at: "13/03/2568" },
-  { id: "CLM1007", title: "เคลม: ร้านยกเลิกออเดอร์",  reporter_id: "USR3007", reporter_name: "วิชัย เก่ง",  shop_name: "ร้านกาแฟ #8",     description: "ร้านยกเลิกออเดอร์ฝ่ายเดียวโดยไม่แจ้งล่วงหน้า โอนเงินไปแล้ว 280 บาท ยังไม่ได้รับเงินคืน",               contact: "LINE: @vichai_k",                          attachments: [{ topic: "สลิปโอนเงิน",             name: "payment_slip.jpg",    url: "#", type: "image" }, { topic: "แชทยกเลิกออเดอร์",    name: "cancel_chat.png",     url: "#", type: "image" }],                                                                                                                                                                                  status: "open",     created_at: "14/03/2568" },
+const ALL_SHOPS = [
+  { id:1,  name:"ร้านข้าวมันไก่สมชาย",       category:"อาหาร",      tier:3, entity_type:"individual", is_closed:false, is_blacklisted:false, is_deleted:false, link:"https://line.me/shop1",  description:"ข้าวมันไก่ต้มและทอด", rating:4.8, location:"สุขุมวิท 11", owner_id:"USR001", img_emoji:"🍗" },
+  { id:2,  name:"ก๋วยเตี๋ยวเรือป้าแดง",       category:"อาหาร",      tier:2, entity_type:"company",    is_closed:false, is_blacklisted:false, is_deleted:false, link:"https://line.me/shop2",  description:"ก๋วยเตี๋ยวเรือสูตรดั้งเดิม", rating:4.6, location:"รามคำแหง 24", owner_id:"USR002", img_emoji:"🍜" },
+  { id:3,  name:"ขนมครกบ้านนา",               category:"ขนม",        tier:1, entity_type:"individual", is_closed:false, is_blacklisted:false, is_deleted:false, link:"https://line.me/shop3",  description:"ขนมครกหอมมะพร้าว", rating:4.3, location:"ลาดพร้าว 41", owner_id:"USR003", img_emoji:"🥥" },
+  { id:4,  name:"ส้มตำอีสานแม่ตุ๋ย",          category:"อาหาร",      tier:2, entity_type:"individual", is_closed:false, is_blacklisted:false, is_deleted:false, link:"https://line.me/shop4",  description:"ส้มตำลาบรสเด็ด", rating:4.7, location:"พระโขนง", owner_id:"USR004", img_emoji:"🥗" },
+  { id:5,  name:"ชานมไข่มุกไต้หวันแท้",       category:"เครื่องดื่ม",tier:3, entity_type:"company",    is_closed:false, is_blacklisted:false, is_deleted:false, link:"https://line.me/shop5",  description:"ชานมไข่มุก", rating:4.9, location:"ทองหล่อ", owner_id:"USR005", img_emoji:"🧋" },
+  { id:6,  name:"ร้านหมูกระทะแซ่บโอ้โห",      category:"อาหาร",      tier:2, entity_type:"company",    is_closed:false, is_blacklisted:false, is_deleted:false, link:"https://line.me/shop7",  description:"หมูกระทะบุฟเฟ่ต์", rating:4.5, location:"บางนา", owner_id:"USR006", img_emoji:"🥩" },
+  { id:7,  name:"กาแฟดริปคั่วสด",             category:"เครื่องดื่ม",tier:2, entity_type:"individual", is_closed:false, is_blacklisted:false, is_deleted:false, link:"https://line.me/shop8",  description:"กาแฟดริปสด", rating:4.7, location:"เชียงใหม่", owner_id:"USR007", img_emoji:"☕" },
+  { id:8,  name:"เค้กวันเกิดสั่งทำพิเศษ",     category:"ขนม",        tier:3, entity_type:"company",    is_closed:false, is_blacklisted:false, is_deleted:false, link:"https://line.me/shop15", description:"เค้กวันเกิด Custom", rating:4.9, location:"จตุจักร", owner_id:"USR008", img_emoji:"🎂" },
+  // ร้าน tier 2 รอเลื่อนขั้น 3 (UC9)
+  { id:9,  name:"ข้าวหน้าเป็ดพะโล้",           category:"อาหาร",      tier:2, entity_type:"company",    is_closed:false, is_blacklisted:false, is_deleted:false, link:"https://line.me/shop11", description:"ข้าวหน้าเป็ดพะโล้", rating:4.8, location:"เยาวราช", owner_id:"USR009", img_emoji:"🦆" },
+  { id:10, name:"คุกกี้อบสดออเดอร์เมด",        category:"ขนม",        tier:2, entity_type:"individual", is_closed:false, is_blacklisted:false, is_deleted:false, link:"https://line.me/shop12", description:"คุกกี้อบสด", rating:4.6, location:"ปทุมธานี", owner_id:"USR010", img_emoji:"🍪" },
+  // Blacklist
+  { id:26, name:"ร้านต้มยำโกงเงินลูกค้า",     category:"อาหาร",      tier:1, entity_type:"individual", is_closed:false, is_blacklisted:true,  is_deleted:false, link:"", description:"ต้มยำกุ้ง", rating:2.1, location:"มีนบุรี", owner_id:"USR026", img_emoji:"🦐" },
+  { id:27, name:"ร้านขนมปลอมแปลงสินค้า",       category:"ขนม",        tier:1, entity_type:"company",    is_closed:false, is_blacklisted:true,  is_deleted:false, link:"", description:"ขนมปังแซนด์วิช", rating:1.8, location:"ลาดพร้าว", owner_id:"USR027", img_emoji:"🥪" },
 ];
 
-// MOCK REPORTS — รายงานร้านค้าจากฝั่ง User พร้อม dynamic attachments
-const REPORT_REASONS = ["โกงเงิน / ไม่ส่งของ", "สินค้าไม่ตรงรูป", "ร้านค้าปลอม", "ข้อมูลร้านค้าผิด", "อื่นๆ"];
-const MOCK_REPORTS = Array.from({ length: 18 }, (_, i) => ({
-  id: `RPT${String(1000 + i).padStart(4, "0")}`,
-  shop_id: (i % 10) + 1,
-  shop_name: ["ร้านข้าวมันไก่สมชาย","ก๋วยเตี๋ยวเรือป้าแดง","ขนมครกบ้านนา","ส้มตำอีสานแม่ตุ๋ย","ชานมไข่มุกไต้หวันแท้","ปาท่องโก๋กรอบน้อย","ร้านหมูกระทะ","กาแฟดริปคั่วสด","ขนมไทยโบราณ","ข้าวหน้าเป็ด"][i % 10],
-  reporter_id: `USR${String(3000 + i).padStart(4, "0")}`,
-  reporter_name: ["สมชาย แก้ว","ปิยะ ใจดี","นภา สวย","วิชัย เก่ง","แสงดาว มี","ประเสริฐ ดี","สุดา รัก","ธีรพงษ์ ใฝ่","มานะ ขยัน","อรุณ ส่อง"][i % 10],
-  reason: REPORT_REASONS[i % 5],
-  detail: [
-    "โอนเงินไปแล้ว 500 บาท แต่ร้านไม่ส่งของมาเลย ติดต่อกลับก็ไม่รับ ทำอยู่หลายวันแล้ว",
-    "รูปในโปรไฟล์กับของที่ส่งมาไม่ตรงกัน สินค้าคุณภาพต่ำกว่าที่โฆษณาไว้มาก",
-    "สงสัยว่าเป็นร้านปลอม เบอร์โทรไม่มีจริง ที่อยู่ก็ไม่ตรง",
-    "ข้อมูลราคาในโปรไฟล์กับที่เรียกเก็บจริงต่างกัน ไม่แจ้งล่วงหน้า",
-    "ร้านส่งสินค้าผิดชนิด แจ้งขอเปลี่ยนแต่ถูกปฏิเสธ",
-  ][i % 5],
-  attachments: [
-    [
-      {"topic": "สลิปโอนเงิน", "filename": "slip_transfer.jpg", "url": "#", "type": "image"},
-      {"topic": "แชทสนทนากับร้าน", "filename": "chat_screenshot.png", "url": "#", "type": "image"},
-    ],
-    [
-      {"topic": "รูปสินค้าที่ได้รับ", "filename": "product_received.jpg", "url": "#", "type": "image"},
-      {"topic": "รูปโฆษณาในร้าน", "filename": "product_advertised.jpg", "url": "#", "type": "image"},
-      {"topic": "ใบเสร็จ", "filename": "receipt.pdf", "url": "#", "type": "pdf"},
-    ],
-    [
-      {"topic": "หลักฐานตำแหน่งปลอม", "filename": "fake_location.jpg", "url": "#", "type": "image"},
-    ],
-    [
-      {"topic": "สกรีนช็อตราคาเดิม", "filename": "price_old.png", "url": "#", "type": "image"},
-      {"topic": "ใบเสร็จที่ถูกเรียกเก็บ", "filename": "receipt_actual.pdf", "url": "#", "type": "pdf"},
-    ],
-    [
-      {"topic": "รูปสินค้าที่ส่งมาผิด", "filename": "wrong_item.jpg", "url": "#", "type": "image"},
-      {"topic": "แชทปฏิเสธการเปลี่ยน", "filename": "reject_chat.png", "url": "#", "type": "image"},
-      {"topic": "ออเดอร์ต้นฉบับ", "filename": "original_order.pdf", "url": "#", "type": "pdf"},
-    ],
-  ][i % 5],
-  status: ["pending","pending","pending","resolved","dismissed"][i % 5],
-  created_at: new Date(2025, 2, i + 1).toLocaleDateString("th-TH"),
-}));
+const MOCK_REPORTS = [
+  { id:"RPT001", shop_id:3, shop_name:"ขนมครกบ้านนา",   reporter_id:"USR099", reason:"สินค้าไม่ตรงรูป",    detail:"ของที่ได้รับแตกต่างจากรูปโปรไฟล์มาก", date:"12/03/2568", status:"pending",  docs:[{ name:"สลิปโอนเงิน.jpg", label:"สลิปโอนเงิน" },{ name:"รูปสินค้า.jpg", label:"รูปสินค้า" }] },
+  { id:"RPT002", shop_id:6, shop_name:"ร้านหมูกระทะ",    reporter_id:"USR088", reason:"โกงเงิน",             detail:"โอนเงินแล้วร้านหายไม่ตอบ", date:"14/03/2568", status:"pending",  docs:[{ name:"แชท.pdf", label:"แชทสนทนา" }] },
+  { id:"RPT003", shop_id:2, shop_name:"ก๋วยเตี๋ยวเรือ",  reporter_id:"USR077", reason:"ข้อมูลร้านค้าผิด",   detail:"ที่อยู่ไม่ตรง", date:"10/03/2568", status:"resolved", docs:[] },
+];
+
+const MOCK_UPGRADE_REQUESTS = [
+  { id:"UPG001", shop_id:3,  shop_name:"ขนมครกบ้านนา",    shop_emoji:"🥥", current_tier:1, requested_tier:2, entity_type:"individual", date:"08/03/2568", status:"pending", docs:[{ name:"บัตรประชาชน.jpg", label:"บัตรประชาชน" },{ name:"รูปถ่ายคู่บัตร.jpg", label:"รูปถ่ายคู่บัตรประชาชน" }] },
+  { id:"UPG002", shop_id:7,  shop_name:"กาแฟดริปคั่วสด",  shop_emoji:"☕", current_tier:1, requested_tier:2, entity_type:"company",    date:"09/03/2568", status:"pending", docs:[{ name:"ภพ20.pdf", label:"ภพ.20" },{ name:"บัตรกรรมการ.jpg", label:"บัตรประชาชนกรรมการ" }] },
+  { id:"UPG003", shop_id:10, shop_name:"คุกกี้อบสด",       shop_emoji:"🍪", current_tier:1, requested_tier:2, entity_type:"individual", date:"11/03/2568", status:"rejected", reject_reason:"เอกสารไม่ชัดเจน", docs:[{ name:"บัตร.jpg", label:"บัตรประชาชน" }] },
+];
+
+const MOCK_CLAIMS = [
+  { id:"CLM001", shop_id:3, shop_name:"ขนมครกบ้านนา",    claimant_id:"USR099", claimant_contact:"LINE: @user99", detail:"สั่งของแล้วไม่ส่ง โอนเงินไปแล้ว 500 บาท", date:"13/03/2568", status:"pending", docs:[{ name:"สลิปโอนเงิน.jpg", label:"สลิปโอนเงิน" }] },
+  { id:"CLM002", shop_id:6, shop_name:"ร้านหมูกระทะ",    claimant_id:"USR088", claimant_contact:"081-234-5678",   detail:"ของมาไม่ครบ ขาดหมู 2 ถาด", date:"14/03/2568", status:"resolved", docs:[] },
+];
+
+// ============================================================
+// VALIDATION
+// ============================================================
+function validateText(val) {
+  if (!val || val.trim() === "") return "กรุณากรอกข้อมูลให้ครบถ้วน";
+  if (INVALID_CHARS.test(val)) return "ไม่อนุญาตให้ใช้อักขระพิเศษหรืออีโมจิ"; // UC1 Exception
+  return null;
+}
+function validateUrl(val) {
+  if (!val || val.trim() === "") return "กรุณากรอก URL";
+  if (!/^https?:\/\/.+/.test(val)) return "URL ต้องขึ้นต้นด้วย http:// หรือ https://";
+  return null;
+}
+function validateUserId(val) {
+  if (!val || val.trim() === "") return "กรุณากรอก User ID";
+  return null;
+}
 
 // ============================================================
 // STYLES
 // ============================================================
 const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
-
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
+  @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&family=Mitr:wght@300;400;500;600&display=swap');
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
   :root {
-    --bg: #0a0a0f;
-    --surface: #111118;
-    --surface2: #18181f;
-    --border: #2a2a35;
-    --border2: #35354a;
-    --accent: #6c63ff;
-    --accent2: #8b5cf6;
-    --accent-glow: rgba(108,99,255,0.15);
-    --green: #10d98a;
-    --red: #ff4757;
-    --yellow: #ffa502;
-    --blue: #2563eb;
-    --text: #e8e8f0;
-    --text2: #9999b0;
-    --text3: #55556a;
-    --font: 'IBM Plex Sans Thai', sans-serif;
-    --mono: 'IBM Plex Mono', monospace;
+    --bg:#f4f1ec; --surface:#ffffff; --surface2:#f0ece4; --border:#e5ddd0; --border2:#ccc5b5;
+    --accent:#c0392b; --accent2:#a93226; --accent-light:#fdf2f1; --accent-glow:rgba(192,57,43,0.12);
+    --green:#16a34a; --green-light:#f0fdf4; --yellow:#d97706; --yellow-light:#fffbeb;
+    --blue:#1d4ed8; --blue-light:#eff6ff; --red:#dc2626; --red-light:#fef2f2;
+    --text:#18130e; --text2:#584f42; --text3:#96887a;
+    --shadow:0 1px 3px rgba(0,0,0,0.06),0 4px 16px rgba(0,0,0,0.04);
+    --shadow-md:0 4px 20px rgba(0,0,0,0.08);
+    --shadow-lg:0 8px 40px rgba(0,0,0,0.14);
+    --font:'Sarabun',sans-serif; --display:'Mitr',sans-serif;
+    --radius:12px; --radius-sm:8px;
+    --sidebar-w:220px;
   }
-
-  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); }
-
-  /* LAYOUT */
-  .app { display: flex; height: 100vh; overflow: hidden; }
-
-  .sidebar {
-    width: 220px; flex-shrink: 0;
-    background: var(--surface);
-    border-right: 1px solid var(--border);
-    display: flex; flex-direction: column;
-    padding: 0;
-  }
-
-  .sidebar-logo {
-    padding: 24px 20px 20px;
-    border-bottom: 1px solid var(--border);
-    font-size: 13px; font-weight: 700; letter-spacing: 0.12em;
-    text-transform: uppercase; color: var(--accent);
-    display: flex; align-items: center; gap: 10px;
-  }
-  .sidebar-logo span { font-size: 18px; }
-
-  .sidebar-nav { flex: 1; padding: 12px 10px; display: flex; flex-direction: column; gap: 2px; }
-
-  .nav-item {
-    display: flex; align-items: center; gap: 10px;
-    padding: 10px 12px; border-radius: 8px;
-    font-size: 13.5px; font-weight: 500; color: var(--text2);
-    cursor: pointer; transition: all 0.15s; border: 1px solid transparent;
-    text-decoration: none;
-  }
-  .nav-item:hover { background: var(--surface2); color: var(--text); }
-  .nav-item.active { background: var(--accent-glow); color: var(--accent); border-color: rgba(108,99,255,0.25); }
-  .nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
-
-  .sidebar-footer { padding: 16px; border-top: 1px solid var(--border); }
-
-  .admin-badge {
-    background: var(--surface2); border: 1px solid var(--border2);
-    border-radius: 8px; padding: 10px 12px;
-    font-size: 12px; color: var(--text2);
-  }
-  .admin-badge strong { display: block; color: var(--text); font-size: 13px; margin-bottom: 2px; }
-
-  .main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
-
-  .topbar {
-    padding: 16px 28px; border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: space-between;
-    background: var(--surface); position: sticky; top: 0; z-index: 10;
-  }
-  .topbar h1 { font-size: 18px; font-weight: 700; }
-  .topbar-sub { font-size: 12px; color: var(--text3); margin-top: 1px; font-family: var(--mono); }
-
-  .content { padding: 24px 28px; flex: 1; }
-
-  /* COMPONENTS */
-  .btn {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 8px 16px; border-radius: 7px; font-size: 13px; font-weight: 600;
-    cursor: pointer; transition: all 0.15s; border: 1px solid transparent;
-    font-family: var(--font);
-  }
-  .btn-primary { background: var(--accent); color: #fff; }
-  .btn-primary:hover { background: var(--accent2); box-shadow: 0 0 20px var(--accent-glow); }
-  .btn-ghost { background: transparent; color: var(--text2); border-color: var(--border2); }
-  .btn-ghost:hover { background: var(--surface2); color: var(--text); }
-  .btn-danger { background: rgba(255,71,87,0.12); color: var(--red); border-color: rgba(255,71,87,0.2); }
-  .btn-danger:hover { background: rgba(255,71,87,0.2); }
-  .btn-warn { background: rgba(255,165,2,0.12); color: var(--yellow); border-color: rgba(255,165,2,0.2); }
-  .btn-warn:hover { background: rgba(255,165,2,0.2); }
-  .btn-success { background: rgba(16,217,138,0.12); color: var(--green); border-color: rgba(16,217,138,0.2); }
-  .btn-success:hover { background: rgba(16,217,138,0.2); }
-  .btn-sm { padding: 5px 10px; font-size: 12px; }
-  .btn-icon { padding: 7px; border-radius: 6px; }
-
-  .badge {
-    display: inline-flex; align-items: center; gap: 4px;
-    padding: 2px 8px; border-radius: 100px; font-size: 11px; font-weight: 600;
-  }
-  .badge-green { background: rgba(16,217,138,0.12); color: var(--green); }
-  .badge-red { background: rgba(255,71,87,0.12); color: var(--red); }
-  .badge-yellow { background: rgba(255,165,2,0.12); color: var(--yellow); }
-  .badge-blue { background: rgba(37,99,235,0.12); color: #60a5fa; }
-  .badge-gray { background: rgba(150,150,170,0.1); color: var(--text3); }
-
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
-
-  .search-bar {
-    display: flex; gap: 10px; margin-bottom: 20px; align-items: center;
-  }
-  .input {
-    background: var(--surface2); border: 1px solid var(--border2);
-    color: var(--text); border-radius: 8px; padding: 9px 14px; font-size: 13px;
-    font-family: var(--font); outline: none; transition: border-color 0.15s;
-  }
-  .input:focus { border-color: var(--accent); }
-  .input-search { flex: 1; }
-  .textarea { resize: vertical; min-height: 80px; }
-
-  /* TABLE */
-  .table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); }
-  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-  thead tr { border-bottom: 1px solid var(--border); background: var(--surface2); }
-  th { padding: 11px 16px; text-align: left; font-size: 11px; font-weight: 700;
-    letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); }
-  td { padding: 13px 16px; border-bottom: 1px solid rgba(42,42,53,0.6); vertical-align: middle; }
-  tr:last-child td { border-bottom: none; }
-  tr:hover td { background: rgba(255,255,255,0.015); }
-
-  /* PAGINATION */
-  .pagination { display: flex; gap: 4px; align-items: center; margin-top: 20px; }
-  .page-btn {
-    width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
-    border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer;
-    border: 1px solid var(--border2); background: transparent; color: var(--text2);
-    transition: all 0.15s; font-family: var(--font);
-  }
-  .page-btn:hover { background: var(--surface2); color: var(--text); }
-  .page-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-  .page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-
-  /* MODAL */
-  .modal-overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.7);
-    display: flex; align-items: center; justify-content: center; z-index: 100;
-    backdrop-filter: blur(4px); animation: fadeIn 0.15s ease;
-  }
-  .modal {
-    background: var(--surface); border: 1px solid var(--border2); border-radius: 16px;
-    width: 520px; max-height: 85vh; overflow-y: auto;
-    box-shadow: 0 24px 80px rgba(0,0,0,0.6); animation: slideUp 0.2s ease;
-  }
-  .modal-wide { width: 640px; }
-  .modal-header {
-    padding: 20px 24px 16px; border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: space-between;
-  }
-  .modal-header h3 { font-size: 16px; font-weight: 700; }
-  .modal-body { padding: 20px 24px; }
-  .modal-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; }
-
-  .detail-row {
-    display: flex; gap: 8px; padding: 10px 0; border-bottom: 1px solid rgba(42,42,53,0.4); align-items: flex-start;
-  }
-  .detail-row:last-child { border-bottom: none; }
-  .detail-label { font-size: 12px; color: var(--text3); min-width: 120px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; padding-top: 1px; }
-  .detail-value { font-size: 13.5px; color: var(--text); flex: 1; }
-
-  .doc-item {
-    display: flex; align-items: center; gap: 10px;
-    padding: 10px 14px; background: var(--surface2); border: 1px solid var(--border);
-    border-radius: 8px; margin-bottom: 8px;
-  }
-  .doc-icon { font-size: 20px; }
-  .doc-name { flex: 1; font-size: 13px; }
-
-  /* STAT CARDS */
-  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
-  .stat-card {
-    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
-    padding: 20px; position: relative; overflow: hidden;
-  }
-  .stat-card::before {
-    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
-    background: var(--accent-color, var(--accent));
-  }
-  .stat-label { font-size: 11px; color: var(--text3); font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
-  .stat-value { font-size: 28px; font-weight: 700; font-family: var(--mono); color: var(--text); }
-  .stat-sub { font-size: 12px; color: var(--text3); margin-top: 4px; }
-
-  /* LOGIN */
-  .login-page {
-    min-height: 100vh; display: flex; align-items: center; justify-content: center;
-    background: var(--bg); position: relative; overflow: hidden;
-  }
-  .login-bg {
-    position: absolute; inset: 0; z-index: 0;
-    background: radial-gradient(ellipse 60% 40% at 50% 0%, rgba(108,99,255,0.12) 0%, transparent 70%);
-  }
-  .login-card {
-    position: relative; z-index: 1;
-    background: var(--surface); border: 1px solid var(--border2);
-    border-radius: 20px; padding: 48px 40px; width: 380px; text-align: center;
-    box-shadow: 0 32px 80px rgba(0,0,0,0.5);
-  }
-  .login-logo { font-size: 36px; margin-bottom: 16px; }
-  .login-title { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
-  .login-sub { font-size: 13px; color: var(--text3); margin-bottom: 32px; }
-  .google-btn {
-    width: 100%; padding: 13px; background: #fff; color: #333; border: none;
-    border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; gap: 10px;
-    transition: all 0.15s; font-family: var(--font);
-  }
-  .google-btn:hover { background: #f5f5f5; transform: translateY(-1px); box-shadow: 0 8px 20px rgba(0,0,0,0.3); }
-
-  @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
-  @keyframes slideUp { from { transform: translateY(16px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
-
-  .empty-state { text-align: center; padding: 60px 20px; color: var(--text3); }
-  .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
-  .empty-state p { font-size: 14px; }
-
-  .reject-form { margin-top: 16px; }
-  .form-label { font-size: 12px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; display: block; }
-
-  .tag { display: inline-block; padding: 1px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; font-family: var(--mono); }
-  .section-title { font-size: 13px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 14px; }
-
-  .notification {
-    position: fixed; top: 20px; right: 20px; z-index: 200;
-    background: var(--surface); border: 1px solid var(--border2);
-    border-radius: 10px; padding: 14px 18px; min-width: 280px;
-    box-shadow: 0 8px 30px rgba(0,0,0,0.4);
-    animation: slideIn 0.25s ease; display: flex; align-items: center; gap: 10px;
-    font-size: 13.5px;
-  }
-  .notification.success { border-left: 3px solid var(--green); }
-  .notification.error { border-left: 3px solid var(--red); }
-  @keyframes slideIn { from { transform: translateX(20px); opacity: 0 } to { transform: translateX(0); opacity: 1 } }
+  html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.6;}
+  .admin-layout{display:flex;min-height:100vh;}
+  .sidebar{width:var(--sidebar-w);background:#1a1208;color:#e8e0d4;flex-shrink:0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;}
+  .sidebar-brand{padding:20px 20px 16px;font-family:var(--display);font-size:18px;font-weight:600;color:#f97316;border-bottom:1px solid rgba(255,255,255,0.08);}
+  .sidebar-brand span{color:#e8e0d4;}
+  .sidebar-section{padding:12px 12px 4px;font-size:10px;font-weight:700;color:#6b5d4e;text-transform:uppercase;letter-spacing:0.1em;}
+  .sidebar-item{display:flex;align-items:center;gap:10px;padding:9px 16px;border-radius:8px;margin:2px 8px;cursor:pointer;font-size:13.5px;font-weight:500;color:#c4b5a0;transition:all 0.15s;}
+  .sidebar-item:hover{background:rgba(255,255,255,0.06);color:#f0e8dc;}
+  .sidebar-item.active{background:rgba(249,115,22,0.15);color:#fb923c;}
+  .sidebar-item-icon{font-size:15px;width:18px;text-align:center;}
+  .main-content{flex:1;padding:28px 32px;overflow-y:auto;}
+  .page-title{font-family:var(--display);font-size:22px;font-weight:600;margin-bottom:4px;}
+  .page-sub{font-size:13px;color:var(--text3);margin-bottom:24px;}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;transition:all 0.18s;border:1.5px solid transparent;font-family:var(--font);white-space:nowrap;}
+  .btn-primary{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .btn-primary:hover{background:var(--accent2);transform:translateY(-1px);}
+  .btn-outline{background:transparent;color:var(--text);border-color:var(--border2);}
+  .btn-outline:hover{background:var(--surface2);}
+  .btn-ghost{background:transparent;color:var(--text2);border-color:transparent;}
+  .btn-ghost:hover{background:var(--surface2);}
+  .btn-danger{background:var(--red-light);color:var(--red);border-color:rgba(220,38,38,0.2);}
+  .btn-danger:hover{background:rgba(220,38,38,0.12);}
+  .btn-success{background:var(--green-light);color:var(--green);border-color:rgba(22,163,74,0.2);}
+  .btn-success:hover{background:rgba(22,163,74,0.1);}
+  .btn-warn{background:var(--yellow-light);color:var(--yellow);border-color:rgba(217,119,6,0.2);}
+  .btn-sm{padding:5px 11px;font-size:12px;}
+  .btn-xs{padding:3px 9px;font-size:11px;}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;transform:none!important;}
+  .badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:100px;font-size:11px;font-weight:700;}
+  .badge-tier1{background:var(--surface2);color:var(--text3);border:1px solid var(--border2);}
+  .badge-tier2{background:#e8f0fe;color:#3b5bdb;border:1px solid #c5d2f6;}
+  .badge-tier3{background:linear-gradient(135deg,#fff7e6,#ffecd2);color:#b45309;border:1px solid #f6d860;}
+  .badge-green{background:var(--green-light);color:var(--green);}
+  .badge-red{background:var(--red-light);color:var(--red);}
+  .badge-yellow{background:var(--yellow-light);color:var(--yellow);}
+  .badge-gray{background:var(--surface2);color:var(--text3);}
+  .badge-blue{background:var(--blue-light);color:var(--blue);}
+  .card{background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:22px;box-shadow:var(--shadow);}
+  .card-title{font-family:var(--display);font-size:15px;font-weight:600;margin-bottom:4px;}
+  .card-sub{font-size:12px;color:var(--text3);margin-bottom:18px;}
+  .input{background:var(--surface);border:1.5px solid var(--border2);color:var(--text);border-radius:var(--radius-sm);padding:9px 13px;font-size:13px;font-family:var(--font);outline:none;transition:border-color 0.18s;width:100%;}
+  .input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow);}
+  .input.error{border-color:var(--red);}
+  .textarea{resize:vertical;min-height:80px;}
+  .form-group{margin-bottom:14px;}
+  .form-label{display:block;font-size:11px;font-weight:700;color:var(--text2);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.04em;}
+  .form-error{font-size:11px;color:var(--red);margin-top:4px;font-weight:600;}
+  .form-hint{font-size:11px;color:var(--text3);margin-top:4px;}
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:100;backdrop-filter:blur(4px);animation:fadeIn 0.15s ease;padding:20px;}
+  .modal{background:var(--surface);border-radius:18px;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;box-shadow:var(--shadow-lg);animation:slideUp 0.2s ease;}
+  .modal-wide{max-width:680px;}
+  .modal-header{padding:20px 22px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+  .modal-header h3{font-family:var(--display);font-size:16px;font-weight:600;}
+  .modal-body{padding:20px 22px;}
+  .modal-footer{padding:14px 22px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;}
+  .table{width:100%;border-collapse:collapse;}
+  .table th{padding:9px 12px;text-align:left;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid var(--border);}
+  .table td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle;}
+  .table tr:last-child td{border-bottom:none;}
+  .table tr:hover td{background:var(--surface2);}
+  .search-bar{display:flex;gap:8px;margin-bottom:20px;}
+  .search-input{flex:1;background:var(--surface);border:1.5px solid var(--border2);color:var(--text);border-radius:var(--radius-sm);padding:9px 14px;font-size:13px;font-family:var(--font);outline:none;}
+  .search-input:focus{border-color:var(--accent);}
+  .alert{border-radius:var(--radius-sm);padding:11px 14px;font-size:13px;display:flex;gap:9px;align-items:flex-start;}
+  .alert-warn{background:var(--yellow-light);color:#92400e;border:1px solid #fde68a;}
+  .alert-success{background:var(--green-light);color:#065f46;border:1px solid #a7f3d0;}
+  .alert-error{background:var(--red-light);color:#991b1b;border:1px solid #fecaca;}
+  .alert-info{background:var(--blue-light);color:#1e40af;border:1px solid #bfdbfe;}
+  .notification{position:fixed;top:20px;right:20px;z-index:200;background:var(--surface);border:1.5px solid var(--border2);border-radius:11px;padding:12px 16px;min-width:260px;box-shadow:var(--shadow-lg);animation:slideIn 0.25s ease;display:flex;align-items:center;gap:9px;font-size:13px;}
+  .notification.success{border-left:3px solid var(--green);}
+  .notification.error{border-left:3px solid var(--red);}
+  .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
+  .stat-card{background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:18px;box-shadow:var(--shadow);}
+  .stat-val{font-size:26px;font-weight:800;font-family:var(--display);}
+  .stat-label{font-size:11px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-top:2px;}
+  .doc-link{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:6px;background:var(--blue-light);color:var(--blue);font-size:12px;font-weight:600;cursor:pointer;border:1px solid rgba(29,78,216,0.15);}
+  .doc-link:hover{background:rgba(29,78,216,0.12);}
+  .detail-row{display:flex;gap:12px;padding:9px 0;border-bottom:1px solid var(--border);}
+  .detail-row:last-child{border-bottom:none;}
+  .detail-label{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;min-width:120px;padding-top:2px;}
+  .detail-value{font-size:13px;color:var(--text);flex:1;}
+  .pagination-wrap{display:flex;align-items:center;justify-content:flex-end;gap:5px;margin-top:18px;}
+  .page-btn{min-width:34px;height:34px;padding:0 7px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid var(--border2);background:var(--surface);color:var(--text2);transition:all 0.15s;font-family:var(--font);display:flex;align-items:center;justify-content:center;}
+  .page-btn:hover:not(:disabled){background:var(--surface2);}
+  .page-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .page-btn:disabled{opacity:0.3;cursor:not-allowed;}
+  .divider{border:none;border-top:1px solid var(--border);margin:16px 0;}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  @keyframes slideUp{from{transform:translateY(12px);opacity:0}to{transform:translateY(0);opacity:1}}
+  @keyframes slideIn{from{transform:translateX(14px);opacity:0}to{transform:translateX(0);opacity:1}}
+  .pill-tabs{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;}
+  .pill-tab{padding:5px 14px;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--border2);background:var(--surface);color:var(--text2);transition:all 0.15s;}
+  .pill-tab.active,.pill-tab:hover{background:var(--accent);color:#fff;border-color:var(--accent);}
 `;
 
 // ============================================================
 // HELPERS
 // ============================================================
-const ITEMS_PER_PAGE = 20;
-
-function paginate(data, page) {
-  const start = (page - 1) * ITEMS_PER_PAGE;
-  return { items: data.slice(start, start + ITEMS_PER_PAGE), total: data.length, totalPages: Math.ceil(data.length / ITEMS_PER_PAGE) };
+function TierBadge({ tier }) {
+  const map = { 1:["badge-tier1","⚪ ขั้น 1"],2:["badge-tier2","🔵 ขั้น 2"],3:["badge-tier3","🥇 ขั้น 3"] };
+  const [cls,label] = map[tier]||map[1];
+  return <span className={`badge ${cls}`}>{label}</span>;
 }
 
-function Pagination({ page, totalPages, onChange }) {
-  const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
-  return (
-    <div className="pagination">
-      <button className="page-btn" onClick={() => onChange(page - 1)} disabled={page === 1}>‹</button>
-      {pages.map(p => <button key={p} className={`page-btn ${p === page ? "active" : ""}`} onClick={() => onChange(p)}>{p}</button>)}
-      <button className="page-btn" onClick={() => onChange(page + 1)} disabled={page === totalPages}>›</button>
-    </div>
-  );
+function Notification({ msg, type, onClose }) {
+  useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t); },[]);
+  return <div className={`notification ${type}`}><span>{type==="success"?"✓":"✕"}</span><span>{msg}</span></div>;
 }
 
 function Modal({ title, onClose, children, footer, wide }) {
   return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className={`modal ${wide ? "modal-wide" : ""}`}>
-        <div className="modal-header">
-          <h3>{title}</h3>
-          <button className="btn btn-ghost btn-sm btn-icon" onClick={onClose}>✕</button>
-        </div>
+    <div className="modal-overlay" onClick={e => e.target===e.currentTarget&&onClose()}>
+      <div className={`modal ${wide?"modal-wide":""}`}>
+        <div className="modal-header"><h3>{title}</h3><button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button></div>
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-footer">{footer}</div>}
       </div>
@@ -412,562 +213,796 @@ function Modal({ title, onClose, children, footer, wide }) {
   );
 }
 
-function Notification({ msg, type, onClose }) {
-  useEffect(() => { const t = setTimeout(onClose, 3000); return () => clearTimeout(t); }, []);
+function Pagination({ currentPage, totalPages, onChange }) {
+  if (totalPages <= 1) return null;
+  const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
   return (
-    <div className={`notification ${type}`}>
-      <span>{type === "success" ? "✓" : "✕"}</span>
-      <span>{msg}</span>
+    <div className="pagination-wrap">
+      <button className="page-btn" onClick={() => onChange(currentPage-1)} disabled={currentPage===1}>‹</button>
+      {pages.map(p => <button key={p} className={`page-btn ${p===currentPage?"active":""}`} onClick={() => onChange(p)}>{p}</button>)}
+      <button className="page-btn" onClick={() => onChange(currentPage+1)} disabled={currentPage===totalPages}>›</button>
+    </div>
+  );
+}
+
+// Simulate download
+function downloadDoc(name) {
+  alert(`ดาวน์โหลด: ${name}\n(ในระบบจริงจะเรียก API เพื่อดาวน์โหลดไฟล์)`);
+}
+
+// ============================================================
+// UC8 — ค้นหาร้านค้า (shared across pages)
+// ============================================================
+function useShopList(shops, query) {
+  return shops.filter(s =>
+    !query || s.name.toLowerCase().includes(query.toLowerCase()) ||
+    s.location.toLowerCase().includes(query.toLowerCase()) ||
+    s.owner_id.toLowerCase().includes(query.toLowerCase())
+  );
+}
+
+// ============================================================
+// SIDEBAR
+// ============================================================
+const NAV_ITEMS = [
+  { id:"dashboard",  icon:"📊", label:"ภาพรวม", section:"ภาพรวม" },
+  { id:"shops",      icon:"🏪", label:"จัดการร้านค้า", section:"ร้านค้า" },
+  { id:"blacklist",  icon:"⛔", label:"รายการ Blacklist" },
+  { id:"upgrade-tier3", icon:"🥇", label:"เลื่อนขั้นที่ 3", section:"คำร้อง" },
+  { id:"upgrade-requests", icon:"📋", label:"คำร้องขอเลื่อนขั้น" },
+  { id:"reports",    icon:"🚩", label:"คำร้องรายงาน" },
+  { id:"claims",     icon:"⚖️", label:"คำร้องขอเคลม" },
+];
+
+function Sidebar({ active, onNavigate }) {
+  let lastSection = "";
+  return (
+    <div className="sidebar">
+      <div className="sidebar-brand">my<span>Order</span> <span style={{fontSize:11,opacity:0.6}}>Admin</span></div>
+      {NAV_ITEMS.map(item => {
+        const showSection = item.section && item.section !== lastSection;
+        if (showSection) lastSection = item.section;
+        return (
+          <div key={item.id}>
+            {showSection && <div className="sidebar-section">{item.section}</div>}
+            <div className={`sidebar-item ${active===item.id?"active":""}`} onClick={() => onNavigate(item.id)}>
+              <span className="sidebar-item-icon">{item.icon}</span>
+              <span>{item.label}</span>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
 // ============================================================
-// PAGES
+// DASHBOARD
 // ============================================================
-
-// --- LOGIN ---
-function LoginPage({ onLogin }) {
-  const handleGoogleLogin = () => {
-    // TODO: Replace with actual Google OAuth
-    // window.google.accounts.id.initialize({ client_id: "YOUR_GOOGLE_CLIENT_ID", callback: handleCredential })
-    // For now, mock login:
-    localStorage.setItem("admin_token", "mock_jwt_token");
-    localStorage.setItem("admin_user", JSON.stringify({ name: "Admin User", email: "admin@example.com" }));
-    onLogin({ name: "Admin User", email: "admin@example.com" });
-  };
-  return (
-    <div className="login-page">
-      <div className="login-bg" />
-      <div className="login-card">
-        <div className="login-logo">🛡️</div>
-        <div className="login-title">Admin Portal</div>
-        <div className="login-sub">เข้าสู่ระบบเพื่อจัดการข้อมูลระบบ</div>
-        <button className="google-btn" onClick={handleGoogleLogin}>
-          <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.2l6.7-6.7C35.6 2.3 30.1 0 24 0 14.6 0 6.6 5.4 2.6 13.3l7.8 6.1C12.4 13.2 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4 7.1-10 7.1-17z"/><path fill="#FBBC05" d="M10.4 28.6A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.6L2.6 13.3A24 24 0 0 0 0 24c0 3.8.9 7.4 2.6 10.7l7.8-6.1z"/><path fill="#34A853" d="M24 48c6.1 0 11.2-2 14.9-5.4l-7.5-5.8c-2 1.4-4.7 2.2-7.4 2.2-6.3 0-11.6-3.7-13.6-9.4l-7.8 6.1C6.6 42.6 14.6 48 24 48z"/></svg>
-          เข้าสู่ระบบด้วย Google
-        </button>
-        <p style={{ marginTop: 20, fontSize: 11, color: "var(--text3)" }}>เฉพาะบัญชีที่ได้รับสิทธิ์แอดมินเท่านั้น</p>
-      </div>
-    </div>
-  );
-}
-
-// --- ALL SHOPS ---
-function AllShopsPage({ notify }) {
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
-  const [searchInput, setSearchInput] = useState("");
-  const [selected, setSelected] = useState(null);
-  const [showAdd, setShowAdd] = useState(false);
-  const [newShop, setNewShop] = useState({ name: "", owner_name: "", user_id: "", phone: "", address: "", category: "อาหาร" });
-  const [shops, setShops] = useState(MOCK_SHOPS.filter(s => s.status !== "deleted"));
-
-  const filtered = shops.filter(s => s.status !== "deleted" && (s.name.includes(search) || s.user_id.includes(search) || s.owner_name.includes(search)));
-  const { items, totalPages } = paginate(filtered, page);
-
-  const handleDelete = (id) => {
-    // TODO: await api.deleteShop(id)
-    setShops(prev => prev.map(s => s.id === id ? { ...s, status: "deleted" } : s));
-    setSelected(null); notify("ลบร้านค้าเรียบร้อยแล้ว", "success");
-  };
-  const handleBlacklist = (id) => {
-    // TODO: await api.blacklistShop(id)
-    setShops(prev => prev.map(s => s.id === id ? { ...s, status: "blacklist" } : s));
-    setSelected(null); notify("เพิ่ม Blacklist เรียบร้อยแล้ว", "success");
-  };
-  const handleAdd = () => {
-    // TODO: await api.addShop(newShop)
-    setShops(prev => [...prev, { ...newShop, id: Date.now(), status: "active", verified: false, created_at: new Date().toLocaleDateString("th-TH"), rating: "0.0", orders_count: 0 }]);
-    setShowAdd(false); notify("เพิ่มร้านค้าใหม่เรียบร้อย", "success");
-    setNewShop({ name: "", owner_name: "", user_id: "", phone: "", address: "", category: "อาหาร" });
-  };
-
-  const statusBadge = (s) => s.status === "blacklist" ? <span className="badge badge-red">⛔ Blacklist</span> : s.verified ? <span className="badge badge-green">✓ Verified</span> : <span className="badge badge-gray">ทั่วไป</span>;
+function DashboardPage() {
+  const total = ALL_SHOPS.filter(s => !s.is_deleted).length;
+  const blacklisted = ALL_SHOPS.filter(s => s.is_blacklisted).length;
+  const pendingUpgrade = MOCK_UPGRADE_REQUESTS.filter(r => r.status==="pending").length;
+  const pendingClaims = MOCK_CLAIMS.filter(c => c.status==="pending").length;
 
   return (
     <div>
-      <div className="stats-row">
-        {[
-          { label: "ร้านค้าทั้งหมด", val: shops.filter(s=>s.status!=="deleted").length, color: "var(--accent)" },
-          { label: "ร้านค้า Verified", val: shops.filter(s=>s.verified && s.status!=="deleted").length, color: "var(--green)" },
-          { label: "Blacklist", val: shops.filter(s=>s.status==="blacklist").length, color: "var(--red)" },
-          { label: "ทั่วไป (ไม่ Verified)", val: shops.filter(s=>s.status==="active" && !s.verified).length, color: "var(--text3)" },
-        ].map(s => (
-          <div className="stat-card" key={s.label} style={{ "--accent-color": s.color }}>
-            <div className="stat-label">{s.label}</div>
-            <div className="stat-value">{s.val}</div>
+      <div className="page-title">📊 ภาพรวมระบบ</div>
+      <div className="page-sub">ข้อมูลสถานะรวมของระบบ myOrder</div>
+
+      <div className="stat-grid">
+        <div className="stat-card"><div className="stat-val" style={{color:"var(--accent)"}}>{total}</div><div className="stat-label">ร้านค้าทั้งหมด</div></div>
+        <div className="stat-card"><div className="stat-val" style={{color:"var(--red)"}}>{blacklisted}</div><div className="stat-label">Blacklist</div></div>
+        <div className="stat-card"><div className="stat-val" style={{color:"var(--yellow)"}}>{pendingUpgrade}</div><div className="stat-label">รอเลื่อนขั้น</div></div>
+        <div className="stat-card"><div className="stat-val" style={{color:"var(--blue)"}}>{pendingClaims}</div><div className="stat-label">คำร้องเคลม</div></div>
+      </div>
+
+      <div className="card">
+        <div className="card-title">คำร้องล่าสุดที่รอดำเนินการ</div>
+        <div className="card-sub">คำร้องที่ยังไม่ได้จัดการ</div>
+        {MOCK_REPORTS.filter(r => r.status==="pending").map(r => (
+          <div key={r.id} style={{display:"flex",justifyContent:"space-between",padding:"10px 0",borderBottom:"1px solid var(--border)",alignItems:"center"}}>
+            <div><div style={{fontWeight:600}}>{r.shop_name}</div><div style={{fontSize:12,color:"var(--text3)"}}>{r.reason} · {r.date}</div></div>
+            <span className="badge badge-yellow">⏳ รอดำเนินการ</span>
           </div>
         ))}
       </div>
+    </div>
+  );
+}
 
+// ============================================================
+// UC6 — จัดการร้านค้า (hub) + UC3 เพิ่ม + UC8 ค้นหา
+// ============================================================
+function ShopsPage({ notify }) {
+  const [shops, setShops] = useState(ALL_SHOPS.filter(s => !s.is_blacklisted && !s.is_deleted));
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [selectedShop, setSelectedShop] = useState(null); // UC6 — manage drawer
+  const [showAddModal, setShowAddModal]  = useState(false); // UC3
+  const [showEditModal, setShowEditModal] = useState(false); // UC1
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false); // UC4
+  const [confirmShop, setConfirmShop] = useState(null);
+
+  // UC1 — form state
+  const [editForm, setEditForm] = useState({});
+  const [editErrors, setEditErrors] = useState({});
+
+  // UC3 — add form state
+  const [addForm, setAddForm] = useState({ name:"", category:"อาหาร", entity_type:"individual", link:"", description:"", location:"", owner_id:"" });
+  const [addErrors, setAddErrors] = useState({});
+
+  const filtered = useShopList(shops, query);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
+  const paged = filtered.slice((page-1)*ITEMS_PER_PAGE, page*ITEMS_PER_PAGE);
+
+  // UC6 — เปิดหน้าจัดการร้านค้า
+  const openManage = (shop) => {
+    setSelectedShop(shop);
+    setEditForm({ name: shop.name, link: shop.link, description: shop.description, location: shop.location });
+    setEditErrors({});
+  };
+
+  // UC1 — validate + save
+  const handleSaveEdit = () => {
+    const errors = {};
+    const ne = validateText(editForm.name); if (ne) errors.name = ne;
+    const le = validateUrl(editForm.link);  if (le) errors.link = le;
+    const de = validateText(editForm.description); if (de) errors.description = de;
+    const loe = validateText(editForm.location);   if (loe) errors.location = loe;
+    if (Object.keys(errors).length) { setEditErrors(errors); return; }
+
+    setShops(prev => prev.map(s => s.id === selectedShop.id ? { ...s, ...editForm } : s));
+    setSelectedShop(s => ({ ...s, ...editForm }));
+    setShowEditModal(false);
+    notify("แก้ไขข้อมูลร้านค้าเรียบร้อย", "success");
+  };
+
+  // UC4 — ลบร้านค้า (soft delete → สถานะ is_deleted)
+  const handleDelete = (shop) => {
+    setShops(prev => prev.filter(s => s.id !== shop.id)); // หายจาก list
+    setSelectedShop(null);
+    setShowDeleteConfirm(false);
+    notify(`ลบร้านค้า "${shop.name}" เรียบร้อยแล้ว`, "success");
+    // TODO: api → update is_deleted = true
+  };
+
+  // UC5 — เพิ่ม Blacklist
+  const handleBlacklist = (shop) => {
+    if (shop.is_blacklisted) return;
+    setShops(prev => prev.map(s => s.id === shop.id ? { ...s, is_blacklisted: true } : s));
+    setSelectedShop(null);
+    notify(`เพิ่ม "${shop.name}" ใน Blacklist แล้ว`, "success");
+    // TODO: api → update is_blacklisted = true
+  };
+
+  // UC3 — เพิ่มร้านค้า validate + save
+  const handleAddShop = () => {
+    const errors = {};
+    const ne = validateText(addForm.name);        if (ne) errors.name = ne;
+    const le = validateUrl(addForm.link);         if (le) errors.link = le;
+    const de = validateText(addForm.description); if (de) errors.description = de;
+    const loe = validateText(addForm.location);   if (loe) errors.location = loe;
+    const oe = validateUserId(addForm.owner_id);  if (oe) errors.owner_id = oe;
+    if (Object.keys(errors).length) { setAddErrors(errors); return; }
+
+    const newShop = { ...addForm, id: Date.now(), tier: 1, rating: 0, is_closed: false, is_blacklisted: false, is_deleted: false, img_emoji: "🏪" };
+    setShops(prev => [newShop, ...prev]);
+    setShowAddModal(false);
+    setAddForm({ name:"", category:"อาหาร", entity_type:"individual", link:"", description:"", location:"", owner_id:"" });
+    setAddErrors({});
+    notify("เพิ่มร้านค้าใหม่เรียบร้อยแล้ว", "success");
+    // UC3 Exception: ถ้าข้อมูลเยอะร้านใหม่ไปอยู่หน้าอื่น จะไม่ scroll ไป
+  };
+
+  const categories = ["อาหาร","ขนม","เครื่องดื่ม","อื่นๆ"];
+
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
+        <div>
+          <div className="page-title">🏪 จัดการร้านค้า</div>
+          <div className="page-sub">รายการร้านค้าทั้งหมดในระบบ (ไม่รวม Blacklist)</div>
+        </div>
+        {/* UC3 — ปุ่มเพิ่มร้านค้า */}
+        <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>＋ เพิ่มร้านค้า</button>
+      </div>
+
+      {/* UC8 — ค้นหาร้านค้า */}
       <div className="search-bar">
-        <input className="input input-search" placeholder="ค้นหาชื่อร้าน, ชื่อเจ้าของ, User ID..." value={searchInput} onChange={e => setSearchInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { setSearch(searchInput); setPage(1); } }} />
-        <button className="btn btn-ghost" onClick={() => { setSearch(searchInput); setPage(1); }}>🔍 ค้นหา</button>
-        <button className="btn btn-primary" onClick={() => setShowAdd(true)}>＋ เพิ่มร้านค้า</button>
+        <input className="search-input" placeholder="ค้นหาชื่อร้าน, ที่อยู่, หรือ User ID เจ้าของ..."
+          value={query} onChange={e => { setQuery(e.target.value); setPage(1); }} />
       </div>
 
-      <div className="table-wrap">
-        <table>
-          <thead><tr><th>#</th><th>ชื่อร้านค้า</th><th>เจ้าของ</th><th>User ID</th><th>หมวดหมู่</th><th>สถานะ</th><th>วันที่สร้าง</th><th></th></tr></thead>
-          <tbody>
-            {items.length === 0 ? <tr><td colSpan={8}><div className="empty-state"><div className="icon">🔍</div><p>ไม่พบร้านค้า</p></div></td></tr> :
-              items.map((s, i) => (
-                <tr key={s.id}>
-                  <td style={{ color: "var(--text3)", fontFamily: "var(--mono)", fontSize: 12 }}>{(page - 1) * ITEMS_PER_PAGE + i + 1}</td>
-                  <td><strong>{s.name}</strong></td>
-                  <td style={{ color: "var(--text2)" }}>{s.owner_name}</td>
-                  <td><span className="tag badge badge-blue">{s.user_id}</span></td>
-                  <td style={{ color: "var(--text2)" }}>{s.category}</td>
-                  <td>{statusBadge(s)}</td>
-                  <td style={{ color: "var(--text3)", fontSize: 12 }}>{s.created_at}</td>
-                  <td><button className="btn btn-ghost btn-sm" onClick={() => setSelected(s)}>จัดการ</button></td>
-                </tr>
-              ))}
-          </tbody>
-        </table>
-      </div>
-      {totalPages > 1 && <Pagination page={page} totalPages={totalPages} onChange={setPage} />}
-
-      {selected && (
-        <Modal title="จัดการร้านค้า" onClose={() => setSelected(null)} wide
-          footer={<>
-            <button className="btn btn-ghost btn-sm" onClick={() => setSelected(null)}>ปิด</button>
-            <button className="btn btn-warn btn-sm" onClick={() => handleBlacklist(selected.id)} disabled={selected.status === "blacklist"}>⛔ เพิ่ม Blacklist</button>
-            <button className="btn btn-danger btn-sm" onClick={() => handleDelete(selected.id)}>🗑️ ลบร้านค้า</button>
-          </>}>
-          <div className="section-title">ข้อมูลร้านค้า</div>
-          {[["ชื่อร้านค้า", selected.name], ["เจ้าของ", selected.owner_name], ["User ID", selected.user_id], ["เบอร์โทร", selected.phone], ["ที่อยู่", selected.address], ["หมวดหมู่", selected.category], ["คะแนน", `⭐ ${selected.rating}`], ["ออเดอร์ทั้งหมด", `${selected.orders_count} ออเดอร์`], ["วันที่สร้าง", selected.created_at], ["สถานะ", selected.status]].map(([l, v]) => (
-            <div className="detail-row" key={l}><div className="detail-label">{l}</div><div className="detail-value">{v}</div></div>
-          ))}
-        </Modal>
+      {/* UC8 Exception: ไม่พบ */}
+      {filtered.length === 0 && (
+        <div className="alert alert-info">🔍 ไม่พบร้านค้าที่ตรงกับ "{query}"</div>
       )}
 
-      {showAdd && (
-        <Modal title="เพิ่มร้านค้าใหม่" onClose={() => setShowAdd(false)}
-          footer={<>
-            <button className="btn btn-ghost btn-sm" onClick={() => setShowAdd(false)}>ยกเลิก</button>
-            <button className="btn btn-primary btn-sm" onClick={handleAdd}>บันทึก</button>
-          </>}>
-          {[["name", "ชื่อร้านค้า"], ["owner_name", "ชื่อเจ้าของ"], ["user_id", "User ID"], ["phone", "เบอร์โทร"], ["address", "ที่อยู่"]].map(([k, l]) => (
-            <div key={k} style={{ marginBottom: 12 }}>
-              <label className="form-label">{l}</label>
-              <input className="input" style={{ width: "100%" }} value={newShop[k]} onChange={e => setNewShop(p => ({ ...p, [k]: e.target.value }))} />
-            </div>
-          ))}
-          <div>
-            <label className="form-label">หมวดหมู่</label>
-            <select className="input" style={{ width: "100%" }} value={newShop.category} onChange={e => setNewShop(p => ({ ...p, category: e.target.value }))}>
-              {["อาหาร", "ขนม", "เครื่องดื่ม", "ของใช้"].map(c => <option key={c}>{c}</option>)}
-            </select>
-          </div>
-        </Modal>
-      )}
-    </div>
-  );
-}
-
-// --- UPGRADE REQUESTS ---
-function UpgradeRequestsPage({ notify }) {
-  const [page, setPage] = useState(1);
-  const [requests, setRequests] = useState(MOCK_UPGRADE_REQUESTS);
-  const [selected, setSelected] = useState(null);
-  const [rejectReason, setRejectReason] = useState("");
-  const [showReject, setShowReject] = useState(false);
-
-  const pending = requests.filter(r => r.status === "pending");
-  const { items, totalPages } = paginate(pending, page);
-
-  const handleApprove = (id) => {
-    // TODO: await api.approveUpgrade(id)
-    setRequests(prev => prev.map(r => r.id === id ? { ...r, status: "approved" } : r));
-    setSelected(null); notify("อนุมัติเรียบร้อยแล้ว ✓", "success");
-  };
-  const handleReject = (id) => {
-    if (!rejectReason.trim()) return;
-    // TODO: await api.rejectUpgrade(id, rejectReason)
-    setRequests(prev => prev.map(r => r.id === id ? { ...r, status: "rejected", reject_rounds: r.reject_rounds + 1 } : r));
-    setSelected(null); setShowReject(false); setRejectReason("");
-    notify("ปฏิเสธคำขอเรียบร้อยแล้ว", "success");
-  };
-
-  return (
-    <div>
-      <div className="stats-row" style={{ gridTemplateColumns: "repeat(3,1fr)" }}>
-        {[
-          { label: "รอดำเนินการ", val: requests.filter(r=>r.status==="pending").length, color: "var(--yellow)" },
-          { label: "อนุมัติแล้ว", val: requests.filter(r=>r.status==="approved").length, color: "var(--green)" },
-          { label: "ปฏิเสธ", val: requests.filter(r=>r.status==="rejected").length, color: "var(--red)" },
-        ].map(s => (
-          <div className="stat-card" key={s.label} style={{ "--accent-color": s.color }}>
-            <div className="stat-label">{s.label}</div>
-            <div className="stat-value">{s.val}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="table-wrap">
-        <table>
-          <thead><tr><th>#</th><th>ชื่อร้านค้า</th><th>เจ้าของ</th><th>วันที่ส่ง</th><th>รอบที่ไม่ผ่าน</th><th></th></tr></thead>
-          <tbody>
-            {items.length === 0 ? <tr><td colSpan={6}><div className="empty-state"><div className="icon">✅</div><p>ไม่มีคำขอที่รอดำเนินการ</p></div></td></tr> :
-              items.map((r, i) => (
-                <tr key={r.id}>
-                  <td style={{ color: "var(--text3)", fontFamily: "var(--mono)", fontSize: 12 }}>{(page - 1) * ITEMS_PER_PAGE + i + 1}</td>
-                  <td><strong>{r.shop_name}</strong></td>
-                  <td style={{ color: "var(--text2)" }}>{r.owner_name}</td>
-                  <td style={{ color: "var(--text3)", fontSize: 12 }}>{r.submitted_at}</td>
-                  <td>{r.reject_rounds > 0 ? <span className="badge badge-red">ครั้งที่ {r.reject_rounds}</span> : <span className="badge badge-gray">ครั้งแรก</span>}</td>
-                  <td><button className="btn btn-ghost btn-sm" onClick={() => { setSelected(r); setShowReject(false); setRejectReason(""); }}>ตรวจสอบ</button></td>
-                </tr>
-              ))}
-          </tbody>
-        </table>
-      </div>
-      {totalPages > 1 && <Pagination page={page} totalPages={totalPages} onChange={setPage} />}
-
-      {selected && (
-        <Modal title="ตรวจสอบคำขอ Verified" onClose={() => setSelected(null)} wide
-          footer={<>
-            <button className="btn btn-ghost btn-sm" onClick={() => setSelected(null)}>ปิด</button>
-            <button className="btn btn-danger btn-sm" onClick={() => setShowReject(v => !v)}>✕ ปฏิเสธ</button>
-            <button className="btn btn-success btn-sm" onClick={() => handleApprove(selected.id)}>✓ อนุมัติ</button>
-          </>}>
-          <div className="section-title">ข้อมูลร้านค้า</div>
-          {[["ชื่อร้านค้า", selected.shop_name], ["เจ้าของ", selected.owner_name], ["วันที่ส่ง", selected.submitted_at], ["รอบที่ไม่ผ่าน", selected.reject_rounds + " ครั้ง"]].map(([l, v]) => (
-            <div className="detail-row" key={l}><div className="detail-label">{l}</div><div className="detail-value">{v}</div></div>
-          ))}
-          <div className="section-title" style={{ marginTop: 20 }}>เอกสารแนบ</div>
-          {selected.documents.map(doc => (
-            <div className="doc-item" key={doc.name}>
-              <span className="doc-icon">📄</span>
-              <span className="doc-name">{doc.name}</span>
-              <a href={doc.url} className="btn btn-ghost btn-sm" target="_blank" rel="noreferrer">⬇ ดาวน์โหลด</a>
-            </div>
-          ))}
-          {showReject && (
-            <div className="reject-form">
-              <label className="form-label">เหตุผลที่ปฏิเสธ *</label>
-              <textarea className="input textarea" style={{ width: "100%" }} placeholder="กรอกเหตุผล..." value={rejectReason} onChange={e => setRejectReason(e.target.value)} />
-              <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
-                <button className="btn btn-danger btn-sm" onClick={() => handleReject(selected.id)} disabled={!rejectReason.trim()}>ยืนยันการปฏิเสธ</button>
-              </div>
-            </div>
-          )}
-        </Modal>
-      )}
-    </div>
-  );
-}
-
-// --- BLACKLIST ---
-function BlacklistPage() {
-  const [page, setPage] = useState(1);
-  const { items, totalPages } = paginate(MOCK_BLACKLIST, page);
-  return (
-    <div>
-      <div style={{ marginBottom: 20, padding: "12px 16px", background: "rgba(255,71,87,0.06)", border: "1px solid rgba(255,71,87,0.15)", borderRadius: 10, fontSize: 13, color: "var(--text2)", display: "flex", alignItems: "center", gap: 8 }}>
-        <span>⚠️</span> ร้านค้าในรายการนี้ถูกระงับการใช้งาน หากต้องการปลดแบน ต้องเพิ่มฟีเจอร์ใน UC เพิ่มเติม
-      </div>
-      <div className="table-wrap">
-        <table>
-          <thead><tr><th>#</th><th>ชื่อร้านค้า</th><th>เจ้าของ</th><th>วันที่ถูกแบน</th><th>เหตุผล</th><th>คะแนน</th></tr></thead>
-          <tbody>
-            {items.length === 0 ? <tr><td colSpan={6}><div className="empty-state"><div className="icon">🎉</div><p>ไม่มีร้านค้าใน Blacklist</p></div></td></tr> :
-              items.map((s, i) => (
-                <tr key={s.id}>
-                  <td style={{ color: "var(--text3)", fontFamily: "var(--mono)", fontSize: 12 }}>{(page - 1) * ITEMS_PER_PAGE + i + 1}</td>
-                  <td><strong>{s.name}</strong></td>
-                  <td style={{ color: "var(--text2)" }}>{s.owner_name}</td>
-                  <td style={{ color: "var(--text3)", fontSize: 12 }}>{s.blacklisted_at}</td>
-                  <td><span className="badge badge-red">{s.reason}</span></td>
-                  <td style={{ color: "var(--text2)" }}>⭐ {s.rating}</td>
-                </tr>
-              ))}
-          </tbody>
-        </table>
-      </div>
-      {totalPages > 1 && <Pagination page={page} totalPages={totalPages} onChange={setPage} />}
-    </div>
-  );
-}
-
-// --- CLAIMS ---
-function ClaimsPage() {
-  const [page, setPage]         = useState(1);
-  const [selected, setSelected] = useState(null);
-  const [claims, setClaims]     = useState(MOCK_CLAIMS);
-
-  const { items, totalPages } = paginate(claims, page);
-
-  const handleResolve = (id) => {
-    // TODO: await api.resolveClaim(id)
-    setClaims(prev => prev.map(c => c.id === id ? { ...c, status: "resolved" } : c));
-    setSelected(null);
-  };
-
-  const statusBadge = (s) => s === "open"
-    ? <span className="badge badge-yellow">⏳ รอดำเนินการ</span>
-    : <span className="badge badge-green">✓ แก้ไขแล้ว</span>;
-
-  return (
-    <div>
-      {/* STATS */}
-      <div className="stats-row" style={{ gridTemplateColumns: "repeat(3,1fr)" }}>
-        {[
-          { label: "เคลมทั้งหมด",   val: claims.length,                                      color: "var(--accent)" },
-          { label: "รอดำเนินการ",   val: claims.filter(c => c.status === "open").length,     color: "var(--yellow)" },
-          { label: "แก้ไขแล้ว",     val: claims.filter(c => c.status === "resolved").length, color: "var(--green)" },
-        ].map(s => (
-          <div className="stat-card" key={s.label} style={{ "--accent-color": s.color }}>
-            <div className="stat-label">{s.label}</div>
-            <div className="stat-value">{s.val}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* TABLE */}
-      <div className="table-wrap">
-        <table>
+      <div className="card" style={{padding:0,overflow:"hidden"}}>
+        <table className="table">
           <thead>
             <tr>
-              <th>Claim ID</th>
-              <th>หัวข้อ</th>
-              <th>ร้านที่เกี่ยวข้อง</th>
-              <th>ผู้เคลม</th>
-              <th>ช่องทางติดต่อ</th>
-              <th>ไฟล์</th>
-              <th>วันที่</th>
-              <th>สถานะ</th>
-              <th></th>
+              <th>ร้านค้า</th><th>หมวดหมู่</th><th>ระดับ</th>
+              <th>เจ้าของ</th><th>คะแนน</th><th>จัดการ</th>
             </tr>
           </thead>
           <tbody>
-            {items.length === 0
-              ? <tr><td colSpan={9}><div className="empty-state"><div className="icon">📭</div><p>ไม่มีคำขอเคลม</p></div></td></tr>
-              : items.map(c => (
-              <tr key={c.id}>
-                <td><span className="tag badge badge-blue" style={{ fontFamily: "var(--mono)", fontSize: 11 }}>{c.id}</span></td>
-                <td><strong style={{ fontSize: 13 }}>{c.title}</strong></td>
-                <td style={{ color: "var(--text2)", fontSize: 13 }}>{c.shop_name}</td>
+            {paged.map(s => (
+              <tr key={s.id}>
                 <td>
-                  <div style={{ fontSize: 13 }}>{c.reporter_name}</div>
-                  <div style={{ fontSize: 11, color: "var(--text3)", fontFamily: "var(--mono)" }}>{c.reporter_id}</div>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontSize:20}}>{s.img_emoji}</span>
+                    <div>
+                      <div style={{fontWeight:600,fontSize:13}}>{s.name}</div>
+                      <div style={{fontSize:11,color:"var(--text3)"}}>📍 {s.location}</div>
+                    </div>
+                  </div>
                 </td>
-                <td style={{ fontSize: 12, color: "var(--text2)", maxWidth: 160 }}>
-                  <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.contact}</span>
+                <td><span className="badge badge-gray">{s.category}</span></td>
+                <td><TierBadge tier={s.tier} /></td>
+                <td style={{fontSize:12,color:"var(--text3)"}}>{s.owner_id}</td>
+                <td style={{fontWeight:700,color:"var(--yellow)"}}>⭐ {s.rating}</td>
+                <td>
+                  {/* UC6 — ปุ่มจัดการ */}
+                  <button className="btn btn-outline btn-xs" onClick={() => openManage(s)}>จัดการ</button>
                 </td>
-                <td style={{ fontSize: 12, color: "var(--text2)" }}>
-                  {c.attachments.length > 0 ? `${c.attachments.length} ไฟล์` : <span style={{ color: "var(--text3)" }}>—</span>}
-                </td>
-                <td style={{ color: "var(--text3)", fontSize: 12 }}>{c.created_at}</td>
-                <td>{statusBadge(c.status)}</td>
-                <td><button className="btn btn-ghost btn-sm" onClick={() => setSelected(c)}>จัดการ</button></td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      {totalPages > 1 && <Pagination page={page} totalPages={totalPages} onChange={setPage} />}
+      <Pagination currentPage={page} totalPages={totalPages} onChange={setPage} />
 
-      {/* MODAL */}
-      {selected && (
-        <Modal title={`⚖️ เคลม: ${selected.id}`} onClose={() => setSelected(null)} wide
+      {/* UC6 — หน้าจัดการร้านค้า (side panel simulation) */}
+      {selectedShop && (
+        <Modal title={`จัดการ: ${selectedShop.name}`} onClose={() => setSelectedShop(null)} wide>
+          <div style={{display:"flex",gap:14,alignItems:"center",marginBottom:20,padding:"0 0 16px",borderBottom:"1px solid var(--border)"}}>
+            <span style={{fontSize:36}}>{selectedShop.img_emoji}</span>
+            <div>
+              <div style={{fontFamily:"var(--display)",fontSize:16,fontWeight:600}}>{selectedShop.name}</div>
+              <div style={{display:"flex",gap:6,marginTop:4}}><TierBadge tier={selectedShop.tier} /><span className="badge badge-gray">{selectedShop.category}</span></div>
+            </div>
+          </div>
+
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+            {/* UC1 — แก้ไขร้านค้า */}
+            <button className="btn btn-outline" onClick={() => setShowEditModal(true)}>✏️ แก้ไขข้อมูล</button>
+            {/* UC5 — Blacklist */}
+            <button className="btn btn-warn" onClick={() => { handleBlacklist(selectedShop); }} disabled={selectedShop.is_blacklisted}>
+              {selectedShop.is_blacklisted ? "⛔ Blacklist แล้ว" : "⛔ เพิ่ม Blacklist"}
+            </button>
+            {/* UC4 — ลบร้านค้า */}
+            <button className="btn btn-danger" onClick={() => { setConfirmShop(selectedShop); setShowDeleteConfirm(true); }}>🗑️ ลบร้านค้า</button>
+          </div>
+
+          <div className="detail-row"><div className="detail-label">📝 รายละเอียด</div><div className="detail-value">{selectedShop.description}</div></div>
+          <div className="detail-row"><div className="detail-label">📍 ที่อยู่</div><div className="detail-value">{selectedShop.location}</div></div>
+          <div className="detail-row"><div className="detail-label">🔗 ลิงก์</div><div className="detail-value" style={{wordBreak:"break-all"}}>{selectedShop.link||"—"}</div></div>
+          <div className="detail-row"><div className="detail-label">👤 เจ้าของ</div><div className="detail-value">{selectedShop.owner_id}</div></div>
+          <div className="detail-row"><div className="detail-label">👥 ประเภท</div><div className="detail-value">{selectedShop.entity_type==="company"?"🏢 นิติบุคคล":"👤 บุคคลธรรมดา"}</div></div>
+        </Modal>
+      )}
+
+      {/* UC1 — Modal แก้ไขร้านค้า */}
+      {showEditModal && selectedShop && (
+        <Modal title="✏️ แก้ไขข้อมูลร้านค้า" onClose={() => { setShowEditModal(false); setEditErrors({}); }}
           footer={<>
-            <button className="btn btn-ghost btn-sm" onClick={() => setSelected(null)}>ปิด</button>
-            {selected.status === "open" && (
-              <button className="btn btn-success btn-sm" onClick={() => handleResolve(selected.id)}>✓ ดำเนินการแล้ว</button>
-            )}
+            {/* UC1 Exception: กดยกเลิก */}
+            <button className="btn btn-ghost btn-sm" onClick={() => { setShowEditModal(false); setEditErrors({}); }}>ยกเลิก</button>
+            <button className="btn btn-primary btn-sm" onClick={handleSaveEdit}>บันทึก</button>
           </>}>
-
-          <div className="alert alert-info" style={{ marginBottom: 16 }}>
-            ⚖️ คำขอเคลมปัญหา — ผู้ใช้ต้องการให้ทีมงานติดต่อกลับและช่วยประสานงาน
+          <div className="form-group">
+            <label className="form-label">ชื่อร้านค้า *</label>
+            <input className={`input ${editErrors.name?"error":""}`} value={editForm.name}
+              onChange={e => { setEditForm(p=>({...p,name:e.target.value})); setEditErrors(p=>({...p,name:null})); }} />
+            {editErrors.name && <div className="form-error">{editErrors.name}</div>}
           </div>
-
-          <div className="section-title">ข้อมูลคำขอเคลม</div>
-          {[
-            ["Claim ID",         selected.id],
-            ["หัวข้อ",            selected.title],
-            ["ร้านที่เกี่ยวข้อง", selected.shop_name],
-            ["ผู้เคลม",           `${selected.reporter_name} (${selected.reporter_id})`],
-            ["วันที่",            selected.created_at],
-            ["สถานะ",             selected.status === "open" ? "รอดำเนินการ" : "แก้ไขแล้ว"],
-          ].map(([l, v]) => (
-            <div className="detail-row" key={l}><div className="detail-label">{l}</div><div className="detail-value">{v}</div></div>
-          ))}
-
-          {/* CONTACT */}
-          <div className="section-title" style={{ marginTop: 20 }}>📞 ช่องทางติดต่อกลับ</div>
-          <div style={{ background: "rgba(37,99,235,0.06)", border: "1px solid rgba(37,99,235,0.15)", borderRadius: 10, padding: "12px 16px", fontSize: 14, fontWeight: 600, color: "var(--text)" }}>
-            {selected.contact}
+          <div className="form-group">
+            <label className="form-label">ลิงก์ติดต่อ *</label>
+            <input className={`input ${editErrors.link?"error":""}`} value={editForm.link}
+              onChange={e => { setEditForm(p=>({...p,link:e.target.value})); setEditErrors(p=>({...p,link:null})); }} />
+            {editErrors.link && <div className="form-error">{editErrors.link}</div>}
           </div>
-
-          {/* DESCRIPTION */}
-          <div className="section-title" style={{ marginTop: 20 }}>รายละเอียดปัญหา</div>
-          <div style={{ background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 8, padding: 14, fontSize: 13.5, lineHeight: 1.7, color: "var(--text2)" }}>
-            {selected.description}
+          <div className="form-group">
+            <label className="form-label">รายละเอียด *</label>
+            <textarea className={`input textarea ${editErrors.description?"error":""}`} value={editForm.description}
+              onChange={e => { setEditForm(p=>({...p,description:e.target.value})); setEditErrors(p=>({...p,description:null})); }} />
+            {editErrors.description && <div className="form-error">{editErrors.description}</div>}
           </div>
+          <div className="form-group">
+            <label className="form-label">ที่อยู่ *</label>
+            <input className={`input ${editErrors.location?"error":""}`} value={editForm.location}
+              onChange={e => { setEditForm(p=>({...p,location:e.target.value})); setEditErrors(p=>({...p,location:null})); }} />
+            {editErrors.location && <div className="form-error">{editErrors.location}</div>}
+          </div>
+        </Modal>
+      )}
 
-          {/* ATTACHMENTS */}
-          {selected.attachments.length > 0 && (
-            <>
-              <div className="section-title" style={{ marginTop: 20 }}>
-                ไฟล์แนบหลักฐาน
-                <span style={{ fontWeight: 400, color: "var(--text3)", marginLeft: 8, fontSize: 12, textTransform: "none", letterSpacing: 0 }}>
-                  ({selected.attachments.length} ไฟล์)
-                </span>
-              </div>
-              {selected.attachments.map((att, idx) => (
-                <div key={idx} className="doc-item" style={{ marginBottom: 8 }}>
-                  <span className="doc-icon">{att.type === "pdf" ? "📄" : "🖼️"}</span>
-                  <div style={{ flex: 1 }}>
-                    {att.topic && <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 2 }}>{att.topic}</div>}
-                    <div style={{ fontSize: att.topic ? 11 : 13, color: "var(--text3)" }}>{att.name || att.filename}</div>
-                  </div>
-                  <a href={att.url} className="btn btn-ghost btn-sm" target="_blank" rel="noreferrer">⬇ ดาวน์โหลด</a>
-                </div>
-              ))}
-            </>
-          )}
+      {/* UC4 — Confirm Delete */}
+      {showDeleteConfirm && confirmShop && (
+        <Modal title="🗑️ ยืนยันการลบร้านค้า" onClose={() => setShowDeleteConfirm(false)}
+          footer={<>
+            {/* UC4 Exception: กดยกเลิก */}
+            <button className="btn btn-ghost btn-sm" onClick={() => setShowDeleteConfirm(false)}>ยกเลิก</button>
+            <button className="btn btn-danger btn-sm" onClick={() => handleDelete(confirmShop)}>ยืนยันลบ</button>
+          </>}>
+          <div className="alert alert-warn" style={{marginBottom:16}}>
+            ⚠️ การลบร้านค้าจะทำให้ร้านนี้ไม่ปรากฏในระบบ ผู้ใช้จะไม่สามารถค้นหาได้อีก
+          </div>
+          <p style={{fontSize:14}}>คุณต้องการลบ <strong>"{confirmShop.name}"</strong> ออกจากระบบ?</p>
+          <p style={{fontSize:12,color:"var(--text3)",marginTop:8}}>สถานะร้านค้าในฐานข้อมูลจะเปลี่ยนเป็น "ถูกลบ"</p>
+        </Modal>
+      )}
+
+      {/* UC3 — Modal เพิ่มร้านค้า */}
+      {showAddModal && (
+        <Modal title="＋ เพิ่มร้านค้าใหม่" onClose={() => { setShowAddModal(false); setAddErrors({}); }} wide
+          footer={<>
+            <button className="btn btn-ghost btn-sm" onClick={() => { setShowAddModal(false); setAddErrors({}); }}>ยกเลิก</button>
+            <button className="btn btn-primary btn-sm" onClick={handleAddShop}>เพิ่มร้านค้า</button>
+          </>}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+            <div className="form-group" style={{gridColumn:"1/-1"}}>
+              <label className="form-label">ชื่อร้านค้า *</label>
+              <input className={`input ${addErrors.name?"error":""}`} value={addForm.name}
+                onChange={e => { setAddForm(p=>({...p,name:e.target.value})); setAddErrors(p=>({...p,name:null})); }} />
+              {addErrors.name && <div className="form-error">{addErrors.name}</div>}
+            </div>
+            <div className="form-group">
+              <label className="form-label">หมวดหมู่ *</label>
+              <select className="input" value={addForm.category} onChange={e => setAddForm(p=>({...p,category:e.target.value}))}>
+                {categories.map(c => <option key={c}>{c}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">ประเภทเจ้าของ *</label>
+              <select className="input" value={addForm.entity_type} onChange={e => setAddForm(p=>({...p,entity_type:e.target.value}))}>
+                <option value="individual">บุคคลธรรมดา</option>
+                <option value="company">นิติบุคคล</option>
+              </select>
+            </div>
+            <div className="form-group" style={{gridColumn:"1/-1"}}>
+              <label className="form-label">User ID เจ้าของร้าน *</label>
+              <input className={`input ${addErrors.owner_id?"error":""}`} placeholder="เช่น USR0042"
+                value={addForm.owner_id} onChange={e => { setAddForm(p=>({...p,owner_id:e.target.value})); setAddErrors(p=>({...p,owner_id:null})); }} />
+              {addErrors.owner_id && <div className="form-error">{addErrors.owner_id}</div>}
+              <div className="form-hint">กรอก ID ของผู้ใช้ที่เป็นเจ้าของร้านค้า</div>
+            </div>
+            <div className="form-group" style={{gridColumn:"1/-1"}}>
+              <label className="form-label">ลิงก์ติดต่อ *</label>
+              <input className={`input ${addErrors.link?"error":""}`} placeholder="https://line.me/..."
+                value={addForm.link} onChange={e => { setAddForm(p=>({...p,link:e.target.value})); setAddErrors(p=>({...p,link:null})); }} />
+              {addErrors.link && <div className="form-error">{addErrors.link}</div>}
+            </div>
+            <div className="form-group" style={{gridColumn:"1/-1"}}>
+              <label className="form-label">ที่อยู่ *</label>
+              <input className={`input ${addErrors.location?"error":""}`} value={addForm.location}
+                onChange={e => { setAddForm(p=>({...p,location:e.target.value})); setAddErrors(p=>({...p,location:null})); }} />
+              {addErrors.location && <div className="form-error">{addErrors.location}</div>}
+            </div>
+            <div className="form-group" style={{gridColumn:"1/-1"}}>
+              <label className="form-label">รายละเอียดร้าน *</label>
+              <textarea className={`input textarea ${addErrors.description?"error":""}`} value={addForm.description}
+                onChange={e => { setAddForm(p=>({...p,description:e.target.value})); setAddErrors(p=>({...p,description:null})); }} />
+              {addErrors.description && <div className="form-error">{addErrors.description}</div>}
+            </div>
+          </div>
+          {/* UC3 Exception: ถ้าข้อมูลมีปัญหา จะแสดง error แต่ละ field ด้านบน */}
         </Modal>
       )}
     </div>
   );
 }
 
-// --- REPORTS ---
-function ReportsPage({ notify }) {
+// ============================================================
+// UC7 — ดูรายการร้านค้า Blacklist (+ UC8 ค้นหา)
+// ============================================================
+function BlacklistPage({ notify }) {
+  const [shops, setShops] = useState(ALL_SHOPS.filter(s => s.is_blacklisted && !s.is_deleted));
+  const [query, setQuery] = useState("");
+  const [page, setPage]   = useState(1);
+  const [selectedShop, setSelectedShop] = useState(null);
+
+  const filtered = useShopList(shops, query);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
+  const paged = filtered.slice((page-1)*ITEMS_PER_PAGE, page*ITEMS_PER_PAGE);
+
+  return (
+    <div>
+      <div className="page-title">⛔ รายการร้านค้า Blacklist</div>
+      <div className="page-sub">UC7 — ร้านค้าที่ถูกระงับจากระบบ</div>
+
+      {/* UC8 — ค้นหา */}
+      <div className="search-bar">
+        <input className="search-input" placeholder="ค้นหาชื่อร้าน..."
+          value={query} onChange={e => { setQuery(e.target.value); setPage(1); }} />
+      </div>
+
+      <div className="card" style={{padding:0,overflow:"hidden"}}>
+        <table className="table">
+          <thead>
+            <tr><th>ร้านค้า</th><th>หมวดหมู่</th><th>ที่อยู่</th><th>เจ้าของ</th><th>จัดการ</th></tr>
+          </thead>
+          <tbody>
+            {paged.length===0 && (
+              <tr><td colSpan={5} style={{textAlign:"center",padding:"24px",color:"var(--text3)"}}>ไม่พบร้านค้าใน Blacklist</td></tr>
+            )}
+            {paged.map(s => (
+              <tr key={s.id}>
+                <td>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontSize:18}}>{s.img_emoji}</span>
+                    <div>
+                      <div style={{fontWeight:600}}>{s.name}</div>
+                      <span className="badge badge-red" style={{fontSize:10}}>⛔ Blacklist</span>
+                    </div>
+                  </div>
+                </td>
+                <td><span className="badge badge-gray">{s.category}</span></td>
+                <td style={{fontSize:12,color:"var(--text3)"}}>📍 {s.location}</td>
+                <td style={{fontSize:12,color:"var(--text3)"}}>{s.owner_id}</td>
+                <td><button className="btn btn-outline btn-xs" onClick={() => setSelectedShop(s)}>ดูรายละเอียด</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Pagination currentPage={page} totalPages={totalPages} onChange={setPage} />
+
+      {selectedShop && (
+        <Modal title={`รายละเอียด: ${selectedShop.name}`} onClose={() => setSelectedShop(null)}>
+          <div className="alert alert-error" style={{marginBottom:16}}>⛔ ร้านนี้อยู่ใน Blacklist</div>
+          <div className="detail-row"><div className="detail-label">ชื่อร้าน</div><div className="detail-value">{selectedShop.name}</div></div>
+          <div className="detail-row"><div className="detail-label">หมวดหมู่</div><div className="detail-value">{selectedShop.category}</div></div>
+          <div className="detail-row"><div className="detail-label">ที่อยู่</div><div className="detail-value">{selectedShop.location}</div></div>
+          <div className="detail-row"><div className="detail-label">เจ้าของ</div><div className="detail-value">{selectedShop.owner_id}</div></div>
+          <div className="detail-row"><div className="detail-label">รายละเอียด</div><div className="detail-value">{selectedShop.description}</div></div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// UC9 — จัดการเลื่อนขั้นที่ 3 ให้ร้านค้า
+// ============================================================
+function UpgradeTier3Page({ notify }) {
+  const [shops, setShops] = useState(ALL_SHOPS.filter(s => s.tier===2 && !s.is_blacklisted && !s.is_deleted));
+  const [query, setQuery] = useState("");
+  const [page, setPage]   = useState(1);
+  const [selectedShop, setSelectedShop] = useState(null);
+  const [confirmModal, setConfirmModal] = useState(false);
+
+  const filtered = useShopList(shops, query);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
+  const paged = filtered.slice((page-1)*ITEMS_PER_PAGE, page*ITEMS_PER_PAGE);
+
+  // UC9 — ยืนยันว่าทดลองสั่งของแล้ว → เลื่อนขั้น 3
+  const handleConfirmOrder = () => {
+    setShops(prev => prev.filter(s => s.id !== selectedShop.id)); // ออกจาก list tier2
+    setSelectedShop(null);
+    setConfirmModal(false);
+    notify(`เลื่อน "${selectedShop.name}" เป็น ขั้น 3 เรียบร้อย`, "success");
+    // TODO: api → update tier=3 + log admin action (UC9 step 6)
+  };
+
+  return (
+    <div>
+      <div className="page-title">🥇 เลื่อนขั้นที่ 3 ให้ร้านค้า</div>
+      <div className="page-sub">UC9 — ร้านค้าระดับ 2 ที่พร้อมเลื่อนขั้น 3 (myOrder ทดลองสั่งของแล้ว)</div>
+
+      {/* UC8 — ค้นหา */}
+      <div className="search-bar">
+        <input className="search-input" placeholder="ค้นหาชื่อร้าน..." value={query}
+          onChange={e => { setQuery(e.target.value); setPage(1); }} />
+      </div>
+
+      <div className="card" style={{padding:0,overflow:"hidden"}}>
+        <table className="table">
+          <thead>
+            <tr><th>ร้านค้า</th><th>หมวดหมู่</th><th>ระดับปัจจุบัน</th><th>เจ้าของ</th><th>จัดการ</th></tr>
+          </thead>
+          <tbody>
+            {paged.length===0 && (
+              <tr><td colSpan={5} style={{textAlign:"center",padding:"24px",color:"var(--text3)"}}>ไม่มีร้านค้าระดับ 2 ที่รอเลื่อนขั้น</td></tr>
+            )}
+            {paged.map(s => (
+              <tr key={s.id}>
+                <td>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontSize:18}}>{s.img_emoji}</span>
+                    <div style={{fontWeight:600}}>{s.name}</div>
+                  </div>
+                </td>
+                <td><span className="badge badge-gray">{s.category}</span></td>
+                <td><TierBadge tier={s.tier} /></td>
+                <td style={{fontSize:12,color:"var(--text3)"}}>{s.owner_id}</td>
+                <td>
+                  <button className="btn btn-outline btn-xs" onClick={() => { setSelectedShop(s); setConfirmModal(false); }}>จัดการ</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Pagination currentPage={page} totalPages={totalPages} onChange={setPage} />
+
+      {/* UC9 — แสดงรายละเอียดร้านพร้อมปุ่มยืนยัน */}
+      {selectedShop && !confirmModal && (
+        <Modal title={`จัดการเลื่อนขั้น: ${selectedShop.name}`} onClose={() => setSelectedShop(null)}>
+          <div style={{display:"flex",gap:12,alignItems:"center",marginBottom:18,padding:"0 0 14px",borderBottom:"1px solid var(--border)"}}>
+            <span style={{fontSize:32}}>{selectedShop.img_emoji}</span>
+            <div>
+              <div style={{fontFamily:"var(--display)",fontSize:15,fontWeight:600}}>{selectedShop.name}</div>
+              <div style={{display:"flex",gap:6,marginTop:4}}><TierBadge tier={selectedShop.tier} /><span className="badge badge-gray">{selectedShop.category}</span></div>
+            </div>
+          </div>
+          <div className="alert alert-info" style={{marginBottom:16}}>
+            💡 กดปุ่มด้านล่างเพื่อยืนยันว่า myOrder ทดลองสั่งสินค้าจากร้านนี้แล้วและไม่พบการโกง
+          </div>
+          <div className="detail-row"><div className="detail-label">ที่อยู่</div><div className="detail-value">{selectedShop.location}</div></div>
+          <div className="detail-row"><div className="detail-label">เจ้าของ</div><div className="detail-value">{selectedShop.owner_id}</div></div>
+          <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:20}}>
+            {/* UC9 Exception: กดยกเลิก */}
+            <button className="btn btn-ghost btn-sm" onClick={() => setSelectedShop(null)}>ยกเลิก</button>
+            <button className="btn btn-success btn-sm" onClick={() => setConfirmModal(true)}>✓ ทดลองสั่งของแล้ว → เลื่อนขั้น 3</button>
+          </div>
+        </Modal>
+      )}
+
+      {/* UC9 — Confirm */}
+      {selectedShop && confirmModal && (
+        <Modal title="ยืนยันการเลื่อนขั้น" onClose={() => setConfirmModal(false)}
+          footer={<>
+            <button className="btn btn-ghost btn-sm" onClick={() => setConfirmModal(false)}>ยกเลิก</button>
+            <button className="btn btn-success btn-sm" onClick={handleConfirmOrder}>ยืนยัน เลื่อนขั้น 3</button>
+          </>}>
+          <div className="alert alert-warn" style={{marginBottom:14}}>⚠️ การดำเนินการนี้จะเลื่อนร้าน <strong>"{selectedShop.name}"</strong> เป็น ขั้น 3 ทันที</div>
+          <p style={{fontSize:13}}>ข้อมูลการดำเนินการจะถูกบันทึกในระบบ</p>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// UC10 — จัดการคำร้องร้านค้าที่ขอเลื่อนขั้น
+// ============================================================
+function UpgradeRequestsPage({ notify }) {
+  const [requests, setRequests] = useState(MOCK_UPGRADE_REQUESTS);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState(null);
-  const [reports, setReports] = useState(MOCK_REPORTS);
-  const { items, totalPages } = paginate(reports, page);
+  const [rejectReason, setRejectReason] = useState("");
+  const [showRejectModal, setShowRejectModal] = useState(false);
 
-  const handleResolve = (id) => {
-    // TODO: await api.resolveReport(id)
-    setReports(prev => prev.map(r => r.id === id ? { ...r, status: "resolved" } : r));
+  const pending = requests.filter(r => r.status==="pending");
+  const totalPages = Math.max(1, Math.ceil(requests.length / ITEMS_PER_PAGE));
+  const paged = requests.slice((page-1)*ITEMS_PER_PAGE, page*ITEMS_PER_PAGE);
+
+  // UC10 — อนุมัติ
+  const handleApprove = (req) => {
+    setRequests(prev => prev.map(r => r.id===req.id ? {...r, status:"approved"} : r));
     setSelected(null);
-    notify("ดำเนินการเรียบร้อยแล้ว", "success");
+    notify(`อนุมัติคำขอเลื่อนขั้นของ "${req.shop_name}" แล้ว`, "success");
+    // TODO: api → update request status="approved", update shop tier, log admin
   };
-  const handleDismiss = (id) => {
-    // TODO: await api.dismissReport(id)
-    setReports(prev => prev.map(r => r.id === id ? { ...r, status: "dismissed" } : r));
+
+  // UC10 A1 — ไม่อนุมัติ
+  const handleReject = (req) => {
+    if (!rejectReason.trim()) return;
+    setRequests(prev => prev.map(r => r.id===req.id ? {...r, status:"rejected", reject_reason:rejectReason} : r));
     setSelected(null);
-    notify("ปิดรายงานเรียบร้อยแล้ว", "success");
+    setShowRejectModal(false);
+    setRejectReason("");
+    notify(`ปฏิเสธคำขอของ "${req.shop_name}"`, "error");
+    // TODO: api → update status="rejected", increment failed_count
   };
 
   const statusBadge = (s) => {
-    if (s === "pending")   return <span className="badge badge-yellow">⏳ รอตรวจสอบ</span>;
-    if (s === "resolved")  return <span className="badge badge-green">✓ แก้ไขแล้ว</span>;
-    return <span className="badge badge-gray">— ปิดแล้ว</span>;
+    if (s==="pending")  return <span className="badge badge-yellow">⏳ รอดำเนินการ</span>;
+    if (s==="approved") return <span className="badge badge-green">✓ อนุมัติ</span>;
+    return <span className="badge badge-red">✕ ไม่อนุมัติ</span>;
   };
-
-  const fileIcon = (type) => type === "pdf" ? "📄" : "🖼️";
 
   return (
     <div>
-      <div className="stats-row" style={{ gridTemplateColumns: "repeat(3,1fr)" }}>
-        {[
-          { label: "รายงานทั้งหมด",  val: reports.length,                                    color: "var(--accent)" },
-          { label: "รอตรวจสอบ",      val: reports.filter(r=>r.status==="pending").length,    color: "var(--yellow)" },
-          { label: "แก้ไขแล้ว",      val: reports.filter(r=>r.status==="resolved").length,   color: "var(--green)" },
-        ].map(s => (
-          <div className="stat-card" key={s.label} style={{ "--accent-color": s.color }}>
-            <div className="stat-label">{s.label}</div>
-            <div className="stat-value">{s.val}</div>
-          </div>
-        ))}
+      <div className="page-title">📋 คำร้องขอเลื่อนขั้น</div>
+      <div className="page-sub">UC10 — รายการคำร้องจากร้านค้าที่ต้องการเลื่อนระดับการยืนยัน</div>
+
+      <div style={{display:"flex",gap:12,marginBottom:20}}>
+        <div className="card" style={{flex:1,padding:"14px 18px",textAlign:"center"}}>
+          <div style={{fontSize:22,fontWeight:800,color:"var(--yellow)"}}>{pending.length}</div>
+          <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase"}}>รอดำเนินการ</div>
+        </div>
+        <div className="card" style={{flex:1,padding:"14px 18px",textAlign:"center"}}>
+          <div style={{fontSize:22,fontWeight:800,color:"var(--green)"}}>{requests.filter(r=>r.status==="approved").length}</div>
+          <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase"}}>อนุมัติแล้ว</div>
+        </div>
+        <div className="card" style={{flex:1,padding:"14px 18px",textAlign:"center"}}>
+          <div style={{fontSize:22,fontWeight:800,color:"var(--red)"}}>{requests.filter(r=>r.status==="rejected").length}</div>
+          <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase"}}>ไม่ผ่าน</div>
+        </div>
       </div>
 
-      <div className="table-wrap">
-        <table>
+      <div className="card" style={{padding:0,overflow:"hidden"}}>
+        <table className="table">
           <thead>
-            <tr>
-              <th>Report ID</th>
-              <th>ร้านที่ถูกรายงาน</th>
-              <th>ประเภท</th>
-              <th>ผู้รายงาน</th>
-              <th>ไฟล์แนบ</th>
-              <th>วันที่</th>
-              <th>สถานะ</th>
-              <th></th>
-            </tr>
+            <tr><th>ร้านค้า</th><th>ขอเลื่อนจาก→ถึง</th><th>ประเภท</th><th>วันที่ยื่น</th><th>สถานะ</th><th>จัดการ</th></tr>
           </thead>
           <tbody>
-            {items.length === 0 ? (
-              <tr><td colSpan={8}><div className="empty-state"><div className="icon">🎉</div><p>ไม่มีรายงาน</p></div></td></tr>
-            ) : items.map(r => (
-              <tr key={r.id}>
-                <td><span className="tag badge badge-blue" style={{ fontFamily: "var(--mono)", fontSize: 11 }}>{r.id}</span></td>
-                <td><strong>{r.shop_name}</strong></td>
-                <td><span className="badge badge-red" style={{ fontSize: 11 }}>{r.reason}</span></td>
+            {paged.map(req => (
+              <tr key={req.id}>
+                <td><div style={{display:"flex",alignItems:"center",gap:6}}><span>{req.shop_emoji}</span><span style={{fontWeight:600}}>{req.shop_name}</span></div></td>
+                <td><div style={{display:"flex",alignItems:"center",gap:6}}><TierBadge tier={req.current_tier} /><span style={{color:"var(--text3)"}}>→</span><TierBadge tier={req.requested_tier} /></div></td>
+                <td><span className="badge badge-gray">{req.entity_type==="company"?"🏢 นิติบุคคล":"👤 บุคคลธรรมดา"}</span></td>
+                <td style={{fontSize:12,color:"var(--text3)"}}>{req.date}</td>
+                <td>{statusBadge(req.status)}</td>
                 <td>
-                  <div style={{ fontSize: 13 }}>{r.reporter_name}</div>
-                  <div style={{ fontSize: 11, color: "var(--text3)", fontFamily: "var(--mono)" }}>{r.reporter_id}</div>
+                  <button className="btn btn-outline btn-xs" onClick={() => setSelected(req)}>จัดการ</button>
                 </td>
-                <td>
-                  <span style={{ fontSize: 12, color: "var(--text2)" }}>
-                    {r.attachments.length > 0 ? `${r.attachments.length} ไฟล์` : <span style={{ color: "var(--text3)" }}>—</span>}
-                  </span>
-                </td>
-                <td style={{ color: "var(--text3)", fontSize: 12 }}>{r.created_at}</td>
-                <td>{statusBadge(r.status)}</td>
-                <td><button className="btn btn-ghost btn-sm" onClick={() => setSelected(r)}>จัดการ</button></td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      {totalPages > 1 && <Pagination page={page} totalPages={totalPages} onChange={setPage} />}
+      <Pagination currentPage={page} totalPages={totalPages} onChange={setPage} />
 
+      {/* UC10 — Modal จัดการคำขอ */}
       {selected && (
-        <Modal title={`รายงาน: ${selected.id}`} onClose={() => setSelected(null)} wide
-          footer={<>
-            <button className="btn btn-ghost btn-sm" onClick={() => setSelected(null)}>ปิด</button>
-            {selected.status === "pending" && <>
-              <button className="btn btn-warn btn-sm" onClick={() => handleDismiss(selected.id)}>— ปิดรายงาน</button>
-              <button className="btn btn-success btn-sm" onClick={() => handleResolve(selected.id)}>✓ ดำเนินการแล้ว</button>
-            </>}
-          </>}>
-
-          {/* INFO */}
-          <div className="section-title">ข้อมูลรายงาน</div>
-          {[
-            ["Report ID",       selected.id],
-            ["ร้านที่ถูกรายงาน", selected.shop_name],
-            ["ประเภท",           selected.reason],
-            ["ผู้รายงาน",        `${selected.reporter_name} (${selected.reporter_id})`],
-            ["วันที่",           selected.created_at],
-            ["สถานะ",            selected.status === "pending" ? "รอตรวจสอบ" : selected.status === "resolved" ? "แก้ไขแล้ว" : "ปิดแล้ว"],
-          ].map(([l, v]) => (
-            <div className="detail-row" key={l}><div className="detail-label">{l}</div><div className="detail-value">{v}</div></div>
-          ))}
-
-          {/* DETAIL */}
-          <div className="section-title" style={{ marginTop: 20 }}>รายละเอียดปัญหา</div>
-          <div style={{ background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 8, padding: 14, fontSize: 13.5, lineHeight: 1.7, color: "var(--text2)", marginBottom: 20 }}>
-            {selected.detail}
-          </div>
-
-          {/* DYNAMIC ATTACHMENTS */}
-          <div className="section-title">
-            ไฟล์แนบหลักฐาน
-            <span style={{ fontWeight: 400, color: "var(--text3)", marginLeft: 8, fontSize: 12, textTransform: "none", letterSpacing: 0 }}>
-              ({selected.attachments.length} ไฟล์)
-            </span>
-          </div>
-          {selected.attachments.length === 0 ? (
-            <p style={{ fontSize: 13, color: "var(--text3)" }}>ไม่มีไฟล์แนบ</p>
-          ) : (
-            selected.attachments.map((att, idx) => (
-              <div key={idx} className="doc-item" style={{ marginBottom: 8 }}>
-                <span className="doc-icon">{fileIcon(att.type)}</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{att.topic}</div>
-                  <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 2 }}>{att.filename}</div>
+        <Modal title={`จัดการคำขอ: ${selected.shop_name}`} onClose={() => setSelected(null)} wide>
+          <div style={{marginBottom:16}}>
+            <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:12}}>
+              <span style={{fontSize:28}}>{selected.shop_emoji}</span>
+              <div>
+                <div style={{fontFamily:"var(--display)",fontSize:15,fontWeight:600}}>{selected.shop_name}</div>
+                <div style={{display:"flex",gap:6,marginTop:4}}>
+                  <TierBadge tier={selected.current_tier} />
+                  <span style={{color:"var(--text3)"}}>→</span>
+                  <TierBadge tier={selected.requested_tier} />
+                  {statusBadge(selected.status)}
                 </div>
-                <a href={att.url} className="btn btn-ghost btn-sm" target="_blank" rel="noreferrer">⬇ ดาวน์โหลด</a>
               </div>
-            ))
+            </div>
+
+            <div className="detail-row"><div className="detail-label">ประเภทเจ้าของ</div><div className="detail-value">{selected.entity_type==="company"?"🏢 นิติบุคคล":"👤 บุคคลธรรมดา"}</div></div>
+            <div className="detail-row"><div className="detail-label">วันที่ยื่น</div><div className="detail-value">{selected.date}</div></div>
+            {selected.reject_reason && <div className="detail-row"><div className="detail-label">เหตุผลที่ไม่ผ่าน</div><div className="detail-value" style={{color:"var(--red)"}}>{selected.reject_reason}</div></div>}
+          </div>
+
+          {/* UC10 — UC17 เอกสาร: ดาวน์โหลดตรวจสอบ */}
+          {selected.docs.length > 0 && (
+            <div style={{marginBottom:20}}>
+              <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:10}}>เอกสารที่ส่งมา</div>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {selected.docs.map((doc,i) => (
+                  <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"var(--surface2)",padding:"10px 14px",borderRadius:10,border:"1px solid var(--border)"}}>
+                    <div>
+                      <div style={{fontWeight:600,fontSize:13}}>{doc.label}</div>
+                      <div style={{fontSize:11,color:"var(--text3)"}}>{doc.name}</div>
+                    </div>
+                    {/* UC10 — ดาวน์โหลดเอกสาร */}
+                    <button className="doc-link" onClick={() => downloadDoc(doc.name)}>⬇ ดาวน์โหลด</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {selected.status==="pending" && (
+            <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+              {/* UC10 A1 — ไม่อนุมัติ */}
+              <button className="btn btn-danger btn-sm" onClick={() => setShowRejectModal(true)}>✕ ไม่อนุมัติ</button>
+              {/* UC10 — อนุมัติ */}
+              <button className="btn btn-success btn-sm" onClick={() => handleApprove(selected)}>✓ อนุมัติ</button>
+            </div>
+          )}
+        </Modal>
+      )}
+
+      {/* UC10 A1 — Modal ระบุเหตุผลไม่อนุมัติ */}
+      {showRejectModal && selected && (
+        <Modal title="✕ ระบุเหตุผลที่ไม่อนุมัติ" onClose={() => { setShowRejectModal(false); setRejectReason(""); }}
+          footer={<>
+            <button className="btn btn-ghost btn-sm" onClick={() => { setShowRejectModal(false); setRejectReason(""); }}>ยกเลิก</button>
+            <button className="btn btn-danger btn-sm" disabled={!rejectReason.trim()} onClick={() => handleReject(selected)}>ยืนยันไม่อนุมัติ</button>
+          </>}>
+          <div className="form-group">
+            <label className="form-label">เหตุผลที่ไม่อนุมัติ *</label>
+            <textarea className="input textarea" placeholder="เช่น เอกสารไม่ชัดเจน, ข้อมูลไม่ครบถ้วน..."
+              value={rejectReason} onChange={e => setRejectReason(e.target.value)} />
+            <div className="form-hint">เหตุผลนี้จะแสดงให้ร้านค้าเห็นในประวัติคำขอ</div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// UC2 — จัดการคำร้องรายงาน
+// ============================================================
+function ReportsPage({ notify }) {
+  const [reports, setReports] = useState(MOCK_REPORTS);
+  const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState(null);
+
+  const totalPages = Math.max(1, Math.ceil(reports.length / ITEMS_PER_PAGE));
+  const paged = reports.slice((page-1)*ITEMS_PER_PAGE, page*ITEMS_PER_PAGE);
+
+  // UC2 — กดดำเนินการแล้ว → อัปเดตสถานะ
+  const handleResolve = (req) => {
+    setReports(prev => prev.map(r => r.id===req.id ? {...r, status:"resolved"} : r));
+    setSelected(null);
+    notify(`ดำเนินการคำร้อง "${req.shop_name}" เรียบร้อย`, "success");
+    // TODO: api → update status="resolved" + log
+  };
+
+  const statusBadge = (s) => {
+    if (s==="pending")  return <span className="badge badge-yellow">⏳ รอดำเนินการ</span>;
+    return <span className="badge badge-green">✓ ดำเนินการแล้ว</span>;
+  };
+
+  return (
+    <div>
+      <div className="page-title">🚩 คำร้องรายงาน</div>
+      <div className="page-sub">UC2 — รายการร้านค้าที่ถูกรายงานโดยผู้ใช้</div>
+
+      <div className="card" style={{padding:0,overflow:"hidden"}}>
+        <table className="table">
+          <thead>
+            <tr><th>ร้านค้า</th><th>ประเภท</th><th>ผู้รายงาน</th><th>วันที่</th><th>สถานะ</th><th>จัดการ</th></tr>
+          </thead>
+          <tbody>
+            {paged.map(r => (
+              <tr key={r.id}>
+                <td style={{fontWeight:600}}>{r.shop_name}</td>
+                <td><span className="badge badge-red" style={{fontSize:10}}>{r.reason}</span></td>
+                <td style={{fontSize:12,color:"var(--text3)"}}>{r.reporter_id}</td>
+                <td style={{fontSize:12,color:"var(--text3)"}}>{r.date}</td>
+                <td>{statusBadge(r.status)}</td>
+                <td><button className="btn btn-outline btn-xs" onClick={() => setSelected(r)}>จัดการ</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Pagination currentPage={page} totalPages={totalPages} onChange={setPage} />
+
+      {/* UC2 — Modal รายละเอียดคำร้องรายงาน */}
+      {selected && (
+        <Modal title={`คำร้อง: ${selected.shop_name}`} onClose={() => setSelected(null)} wide>
+          <div className="detail-row"><div className="detail-label">รหัสคำร้อง</div><div className="detail-value">{selected.id}</div></div>
+          <div className="detail-row"><div className="detail-label">ร้านค้า</div><div className="detail-value">{selected.shop_name}</div></div>
+          <div className="detail-row"><div className="detail-label">ประเภท</div><div className="detail-value">{selected.reason}</div></div>
+          <div className="detail-row"><div className="detail-label">รายละเอียด</div><div className="detail-value">{selected.detail}</div></div>
+          <div className="detail-row"><div className="detail-label">ผู้รายงาน</div><div className="detail-value">{selected.reporter_id}</div></div>
+          <div className="detail-row"><div className="detail-label">วันที่</div><div className="detail-value">{selected.date}</div></div>
+          <div className="detail-row"><div className="detail-label">สถานะ</div><div className="detail-value">{statusBadge(selected.status)}</div></div>
+
+          {/* UC2 — ดาวน์โหลดเอกสาร */}
+          {selected.docs.length > 0 && (
+            <div style={{marginTop:16,marginBottom:8}}>
+              <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:10}}>เอกสารแนบ</div>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {selected.docs.map((doc,i) => (
+                  <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"var(--surface2)",padding:"9px 12px",borderRadius:9,border:"1px solid var(--border)"}}>
+                    <div>
+                      <div style={{fontWeight:600,fontSize:13}}>{doc.label}</div>
+                      <div style={{fontSize:11,color:"var(--text3)"}}>{doc.name}</div>
+                    </div>
+                    <button className="doc-link" onClick={() => downloadDoc(doc.name)}>⬇ ดาวน์โหลด</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {selected.status==="pending" && (
+            <div style={{display:"flex",justifyContent:"flex-end",marginTop:20}}>
+              {/* UC2 — กดดำเนินการแล้ว */}
+              <button className="btn btn-success btn-sm" onClick={() => handleResolve(selected)}>✓ ดำเนินการแล้ว</button>
+            </div>
           )}
         </Modal>
       )}
@@ -976,73 +1011,132 @@ function ReportsPage({ notify }) {
 }
 
 // ============================================================
-// APP SHELL
+// UC11 — จัดการคำร้องขอเคลม
 // ============================================================
-const PAGES = [
-  { id: "shops",    label: "ร้านค้าทั้งหมด",   icon: "🏪", title: "ร้านค้าทั้งหมด",           sub: "All Shops Management" },
-  { id: "upgrades", label: "คำขอเลื่อนขั้น",   icon: "⬆️", title: "คำขอ Verified",             sub: "Upgrade Requests" },
-  { id: "reports",  label: "รายงานร้านค้า",     icon: "🚩", title: "รายงานร้านค้า",             sub: "Shop Reports" },
-  { id: "blacklist",label: "Blacklist",         icon: "⛔", title: "ร้านค้า Blacklist",          sub: "Blacklisted Shops" },
-  { id: "claims",   label: "เคลมปัญหา",         icon: "⚖️", title: "คำขอเคลมปัญหา",              sub: "Claims" },
-];
+function ClaimsPage({ notify }) {
+  const [claims, setClaims] = useState(MOCK_CLAIMS);
+  const [page, setPage]     = useState(1);
+  const [selected, setSelected] = useState(null);
 
-export default function App() {
-  const [authed, setAuthed] = useState(!!localStorage.getItem("admin_token"));
-  const [user, setUser] = useState(() => { try { return JSON.parse(localStorage.getItem("admin_user")); } catch { return null; } });
-  const [activePage, setActivePage] = useState("shops");
-  const [notification, setNotification] = useState(null);
+  const totalPages = Math.max(1, Math.ceil(claims.length / ITEMS_PER_PAGE));
+  const paged = claims.slice((page-1)*ITEMS_PER_PAGE, page*ITEMS_PER_PAGE);
 
-  const notify = (msg, type = "success") => setNotification({ msg, type });
-  const page = PAGES.find(p => p.id === activePage);
+  // UC11 — กดดำเนินการแล้ว → ปิดคำขอ
+  const handleResolve = (clm) => {
+    setClaims(prev => prev.map(c => c.id===clm.id ? {...c, status:"resolved"} : c));
+    setSelected(null);
+    notify(`ปิดคำร้องเคลมของ "${clm.shop_name}" เรียบร้อย`, "success");
+    // TODO: api → update status="resolved" + log
+  };
 
-  if (!authed) return (
-    <>
-      <style>{styles}</style>
-      <LoginPage onLogin={(u) => { setUser(u); setAuthed(true); }} />
-    </>
+  const statusBadge = (s) => {
+    if (s==="pending")  return <span className="badge badge-yellow">⏳ รอดำเนินการ</span>;
+    return <span className="badge badge-green">✓ ดำเนินการแล้ว</span>;
+  };
+
+  return (
+    <div>
+      <div className="page-title">⚖️ คำร้องขอเคลม</div>
+      <div className="page-sub">UC11 — ติดตามและช่วยเหลือผู้ใช้ที่ประสบปัญหากับร้านค้า</div>
+
+      <div className="card" style={{padding:0,overflow:"hidden"}}>
+        <table className="table">
+          <thead>
+            <tr><th>รหัส</th><th>ร้านค้า</th><th>ผู้ร้องเรียน</th><th>ช่องทางติดต่อ</th><th>วันที่</th><th>สถานะ</th><th>จัดการ</th></tr>
+          </thead>
+          <tbody>
+            {paged.map(c => (
+              <tr key={c.id}>
+                <td style={{fontSize:11,color:"var(--text3)"}}>{c.id}</td>
+                <td style={{fontWeight:600}}>{c.shop_name}</td>
+                <td style={{fontSize:12,color:"var(--text3)"}}>{c.claimant_id}</td>
+                <td style={{fontSize:12}}>{c.claimant_contact}</td>
+                <td style={{fontSize:12,color:"var(--text3)"}}>{c.date}</td>
+                <td>{statusBadge(c.status)}</td>
+                <td><button className="btn btn-outline btn-xs" onClick={() => setSelected(c)}>จัดการ</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Pagination currentPage={page} totalPages={totalPages} onChange={setPage} />
+
+      {/* UC11 — Modal รายละเอียดคำร้องเคลม */}
+      {selected && (
+        <Modal title={`คำร้องเคลม: ${selected.id}`} onClose={() => setSelected(null)} wide>
+          <div className="detail-row"><div className="detail-label">ร้านค้า</div><div className="detail-value">{selected.shop_name}</div></div>
+          <div className="detail-row"><div className="detail-label">ผู้ร้องเรียน</div><div className="detail-value">{selected.claimant_id}</div></div>
+          {/* UC11 — ช่องทางติดต่อเพื่อติดต่อกลับ */}
+          <div className="detail-row">
+            <div className="detail-label">ช่องทางติดต่อ</div>
+            <div className="detail-value">
+              <span style={{background:"var(--green-light)",color:"var(--green)",padding:"2px 10px",borderRadius:100,fontSize:12,fontWeight:700}}>{selected.claimant_contact}</span>
+            </div>
+          </div>
+          <div className="detail-row"><div className="detail-label">รายละเอียด</div><div className="detail-value">{selected.detail}</div></div>
+          <div className="detail-row"><div className="detail-label">วันที่</div><div className="detail-value">{selected.date}</div></div>
+          <div className="detail-row"><div className="detail-label">สถานะ</div><div className="detail-value">{statusBadge(selected.status)}</div></div>
+
+          {/* UC11 — ดาวน์โหลดเอกสาร */}
+          {selected.docs.length > 0 && (
+            <div style={{marginTop:16,marginBottom:8}}>
+              <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:10}}>หลักฐาน</div>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {selected.docs.map((doc,i) => (
+                  <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"var(--surface2)",padding:"9px 12px",borderRadius:9,border:"1px solid var(--border)"}}>
+                    <div><div style={{fontWeight:600,fontSize:13}}>{doc.label}</div><div style={{fontSize:11,color:"var(--text3)"}}>{doc.name}</div></div>
+                    <button className="doc-link" onClick={() => downloadDoc(doc.name)}>⬇ ดาวน์โหลด</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {selected.status==="pending" && (
+            <div>
+              <div className="alert alert-info" style={{marginTop:16,marginBottom:12}}>
+                📞 ติดต่อผู้ร้องเรียนผ่าน: <strong>{selected.claimant_contact}</strong> เพื่อช่วยเหลือและชดเชย
+              </div>
+              {/* UC11 — กดดำเนินการแล้ว */}
+              <div style={{display:"flex",justifyContent:"flex-end"}}>
+                <button className="btn btn-success btn-sm" onClick={() => handleResolve(selected)}>✓ ดำเนินการแล้ว / ปิดคำร้อง</button>
+              </div>
+            </div>
+          )}
+        </Modal>
+      )}
+    </div>
   );
+}
+
+// ============================================================
+// ADMIN APP SHELL
+// ============================================================
+export default function AdminPanel() {
+  const [activePage, setActivePage] = useState("dashboard");
+  const [notification, setNotification] = useState(null);
+  const notify = (msg, type="success") => setNotification({ msg, type });
+
+  const renderPage = () => {
+    switch(activePage) {
+      case "dashboard":         return <DashboardPage />;
+      case "shops":             return <ShopsPage notify={notify} />;
+      case "blacklist":         return <BlacklistPage notify={notify} />;
+      case "upgrade-tier3":     return <UpgradeTier3Page notify={notify} />;
+      case "upgrade-requests":  return <UpgradeRequestsPage notify={notify} />;
+      case "reports":           return <ReportsPage notify={notify} />;
+      case "claims":            return <ClaimsPage notify={notify} />;
+      default: return <DashboardPage />;
+    }
+  };
 
   return (
     <>
       <style>{styles}</style>
-      <div className="app">
-        <aside className="sidebar">
-          <div className="sidebar-logo"><span>🛡️</span> ADMIN</div>
-          <nav className="sidebar-nav">
-            {PAGES.map(p => (
-              <button key={p.id} className={`nav-item ${activePage === p.id ? "active" : ""}`} onClick={() => setActivePage(p.id)}>
-                <span className="icon">{p.icon}</span>{p.label}
-              </button>
-            ))}
-          </nav>
-          <div className="sidebar-footer">
-            <div className="admin-badge">
-              <strong>{user?.name || "Admin"}</strong>
-              {user?.email || "admin@example.com"}
-            </div>
-            <button className="btn btn-ghost btn-sm" style={{ width: "100%", marginTop: 8 }} onClick={() => { localStorage.clear(); setAuthed(false); setUser(null); }}>
-              ออกจากระบบ
-            </button>
-          </div>
-        </aside>
-
-        <main className="main">
-          <div className="topbar">
-            <div>
-              <h1>{page.title}</h1>
-              <div className="topbar-sub">{page.sub}</div>
-            </div>
-          </div>
-          <div className="content">
-            {activePage === "shops"    && <AllShopsPage notify={notify} />}
-            {activePage === "upgrades" && <UpgradeRequestsPage notify={notify} />}
-            {activePage === "reports"  && <ReportsPage notify={notify} />}
-            {activePage === "blacklist"&& <BlacklistPage />}
-            {activePage === "claims"   && <ClaimsPage />}
-          </div>
-        </main>
+      <div className="admin-layout">
+        <Sidebar active={activePage} onNavigate={setActivePage} />
+        <div className="main-content">{renderPage()}</div>
       </div>
-
       {notification && <Notification msg={notification.msg} type={notification.type} onClose={() => setNotification(null)} />}
     </>
   );

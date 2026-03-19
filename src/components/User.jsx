@@ -534,7 +534,7 @@ function Modal({ title, onClose, children, footer, wide }) {
     </div>
   );
 }
-
+import AboutPage from "./About";
 // ============================================================
 // NAVBAR
 // ============================================================
@@ -553,6 +553,7 @@ function Navbar({ user, onNavigate, darkMode, toggleDark, currentPage }) {
         <div className="nav-center">
           <button className={`nav-tab ${currentPage === "home" ? "active" : ""}`} onClick={() => onNavigate("home")}>🏠 หน้าหลัก</button>
           <button className={`nav-tab ${currentPage === "shop-list" ? "active" : ""}`} onClick={() => onNavigate("shop-list")}>🏪 ร้านค้าทั้งหมด</button>
+          {/* <button className={`nav-tab ${currentPage === "about" ? "active" : ""}`} onClick={() => onNavigate("about")}>ℹ️ เกี่ยวกับเรา</button> */}
         </div>
         <div className="nav-right">
           {user ? (
@@ -1336,19 +1337,28 @@ function MyShopPage({ onNavigate, notify }) {
 // ============================================================
 // PAGE 5: UPGRADE WIZARD
 // ============================================================
-const WIZARD_STEPS = ["เลือกขั้น", "ตรวจสอบ", "อัปโหลด", "ยืนยัน"];
+
+// สมมติว่า WIZARD_STEPS เดิมมี 4 ขั้นตอน ให้เอา "เลือกขั้น" ออกเหลือ 3 ขั้น
+const WIZARD_STEPS = ["ตรวจสอบ", "อัปโหลด", "ยืนยัน"]; 
 
 function UpgradePage({ onNavigate, notify }) {
-  const [step, setStep] = useState(0);
-  const [targetTier, setTargetTier] = useState(null);
+  const currentTier = MOCK_MY_SHOP.current_tier;
+  
+  // ล็อคเป้าหมายให้เป็นขั้นถัดไปเสมอ (1 -> 2, 2 -> 3)
+  const autoTargetTier = currentTier === 1 ? 2 : currentTier === 2 ? 3 : null;
+
+  // เริ่มที่ index 0 ของ WIZARD_STEPS ใหม่ (ข้ามการเลือกขั้น)
+  const [step, setStep] = useState(0); 
+  const [targetTier] = useState(autoTargetTier); 
   const [checks, setChecks] = useState({ fraud_check: null, order_check: null });
   const [files, setFiles] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const fileRefs = useRef({});
 
-  const currentTier = MOCK_MY_SHOP.current_tier;
+  // entity_type ดึงจาก backend (ใช้ mock ไปก่อน — TODO: ดึงจาก api.getMyShop())
+  const entityType = MOCK_MY_SHOP.entity_type;
 
-  // Step 2: Pre-check mock
+  // Step 0 (ใหม่): Pre-check mock
   const runChecks = () => {
     // TODO: await api.checkUpgradeEligibility(targetTier)
     setTimeout(() => {
@@ -1358,10 +1368,11 @@ function UpgradePage({ onNavigate, notify }) {
       });
     }, 800);
   };
-  useEffect(() => { if (step === 1) runChecks(); }, [step]);
 
-  // entity_type ดึงจาก backend (ใช้ mock ไปก่อน — TODO: ดึงจาก api.getMyShop())
-  const entityType = MOCK_MY_SHOP.entity_type;
+  // รันเช็คทันทีเมื่อเข้ามาที่ step ตรวจสอบ (step 0 ใหม่)
+  useEffect(() => { 
+    if (step === 0) runChecks(); 
+  }, [step]);
 
   const getRequiredDocs = () => {
     if (targetTier === 2 && entityType === "individual") return [{ key: "id_card", label: "สำเนาบัตรประชาชน", hint: "ถ่ายภาพให้ชัด ครบ 4 มุม" }];
@@ -1383,10 +1394,17 @@ function UpgradePage({ onNavigate, notify }) {
     notify("ส่งคำขอเรียบร้อยแล้ว รอแอดมินตรวจสอบ", "success");
   };
 
-  // ล็อค: ขั้น 3 ต้องอยู่ขั้น 2 ก่อนเท่านั้น
-  // currentTier=1 → เห็นแค่ขั้น 2 (ขั้น 3 ยังสมัครไม่ได้)
-  // currentTier=2 → เห็นขั้น 3
-  const tierOptions = currentTier === 1 ? [2] : currentTier === 2 ? [3] : [];
+  // กรณีร้านค้าอยู่ขั้นสูงสุดแล้ว หรือหาขั้นต่อไปไม่เจอ
+  if (!targetTier) {
+    return (
+      <div className="page">
+        <div className="section" style={{ paddingTop: 28, maxWidth: 680, textAlign: "center" }}>
+          <h2 style={{ fontFamily: "var(--display)", fontSize: 22, fontWeight: 600, marginBottom: 16 }}>ร้านค้าของคุณอยู่ระดับสูงสุดแล้ว</h2>
+          <button className="btn btn-primary" onClick={() => onNavigate("myshop")}>กลับหน้าร้านค้า</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page">
@@ -1402,7 +1420,7 @@ function UpgradePage({ onNavigate, notify }) {
           </div>
         ) : (
           <>
-            <h2 style={{ fontFamily: "var(--display)", fontSize: 22, fontWeight: 600, marginBottom: 6 }}>ขอเลื่อนขั้นร้านค้า</h2>
+            <h2 style={{ fontFamily: "var(--display)", fontSize: 22, fontWeight: 600, marginBottom: 6 }}>ขอเลื่อนขั้นร้านค้าเป็น ขั้น {targetTier}</h2>
             <p style={{ color: "var(--text2)", fontSize: 14, marginBottom: 28 }}>ระดับปัจจุบัน: <TierBadge tier={currentTier} /></p>
 
             {/* WIZARD STEPS */}
@@ -1415,51 +1433,8 @@ function UpgradePage({ onNavigate, notify }) {
               ))}
             </div>
 
-            {/* STEP 0: เลือกขั้น */}
+            {/* STEP 0 (ใหม่): PRE-CHECK */}
             {step === 0 && (
-              <div className="dash-card">
-                <div className="dash-card-title">เลือกขั้นที่ต้องการเลื่อน</div>
-                <div className="dash-card-sub">ขั้นที่สูงขึ้น = ความน่าเชื่อถือที่มากขึ้น</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
-                  {tierOptions.map(t => (
-                    <div key={t} className={`tier-card tier-${t} ${targetTier === t ? "selected" : ""}`} onClick={() => setTargetTier(t)}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                          <div style={{ width: 20, height: 20, borderRadius: "50%", border: `2px solid ${targetTier === t ? "var(--accent)" : "var(--border2)"}`, background: targetTier === t ? "var(--accent)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{targetTier === t && <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#fff" }} />}</div>
-                          <TierBadge tier={t} />
-                        </div>
-                        {t === 3 && <span style={{ fontSize: 12, fontWeight: 700, color: "var(--yellow)", background: "var(--yellow-light)", padding: "2px 8px", borderRadius: 100 }}>⚠ ต้องมีประวัติสั่ง</span>}
-                      </div>
-                      <p style={{ fontSize: 13, color: "var(--text2)", marginTop: 8, marginLeft: 30 }}>
-                        {t === 2 ? "ยืนยันตัวตนด้วยบัตรประชาชน / เอกสารบริษัท" : "ยืนยันสูงสุด ต้องเคยสั่งสินค้าผ่าน myOrder"}
-                      </p>
-                    </div>
-                  ))}
-
-                  {/* แสดงขั้น 3 แบบล็อค ถ้าปัจจุบันยังเป็นขั้น 1 */}
-                  {currentTier === 1 && (
-                    <div className="tier-card tier-3" style={{ opacity: 0.45, cursor: "not-allowed", position: "relative" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                          <div style={{ width: 20, height: 20, borderRadius: "50%", border: "2px solid var(--border2)", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 11 }}>🔒</div>
-                          <TierBadge tier={3} />
-                        </div>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--red)", background: "var(--red-light)", padding: "2px 8px", borderRadius: 100, border: "1px solid var(--red)" }}>🔒 ต้องเลื่อนขั้น 2 ก่อน</span>
-                      </div>
-                      <p style={{ fontSize: 13, color: "var(--text3)", marginTop: 8, marginLeft: 30 }}>
-                        ต้องผ่านการยืนยันขั้น 2 ก่อนจึงจะสมัครขั้น 3 ได้
-                      </p>
-                    </div>
-                  )}
-                </div>
-                <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                  <button className="btn btn-primary" disabled={!targetTier} onClick={() => setStep(1)}>ถัดไป →</button>
-                </div>
-              </div>
-            )}
-
-            {/* STEP 1: PRE-CHECK */}
-            {step === 1 && (
               <div className="dash-card">
                 <div className="dash-card-title">ตรวจสอบคุณสมบัติ</div>
                 <div className="dash-card-sub">ระบบกำลังตรวจสอบเงื่อนไขก่อนดำเนินการ</div>
@@ -1475,15 +1450,14 @@ function UpgradePage({ onNavigate, notify }) {
                 </div>
                 {checks.fraud_check !== null && (
                   <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-                    <button className="btn btn-ghost btn-sm" onClick={() => setStep(0)}>← ย้อนกลับ</button>
-                    <button className="btn btn-primary" disabled={!checks.fraud_check || (targetTier === 3 && !checks.order_check)} onClick={() => setStep(2)}>ถัดไป →</button>
+                    <button className="btn btn-primary" disabled={!checks.fraud_check || (targetTier === 3 && !checks.order_check)} onClick={() => setStep(1)}>ถัดไป →</button>
                   </div>
                 )}
               </div>
             )}
 
-            {/* STEP 2: UPLOAD */}
-            {step === 2 && (
+            {/* STEP 1 (ใหม่): UPLOAD */}
+            {step === 1 && (
               <div className="dash-card">
                 <div className="dash-card-title">อัปโหลดเอกสาร</div>
                 <div className="dash-card-sub">กรุณาอัปโหลดเอกสารให้ครบถ้วนและชัดเจน</div>
@@ -1501,14 +1475,14 @@ function UpgradePage({ onNavigate, notify }) {
                   </div>
                 ))}
                 <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-                  <button className="btn btn-ghost btn-sm" onClick={() => setStep(1)}>← ย้อนกลับ</button>
-                  <button className="btn btn-primary" disabled={!allFilesUploaded} onClick={() => setStep(3)}>ถัดไป →</button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setStep(0)}>← ย้อนกลับ</button>
+                  <button className="btn btn-primary" disabled={!allFilesUploaded} onClick={() => setStep(2)}>ถัดไป →</button>
                 </div>
               </div>
             )}
 
-            {/* STEP 3: CONFIRM */}
-            {step === 3 && (
+            {/* STEP 2 (ใหม่): CONFIRM */}
+            {step === 2 && (
               <div className="dash-card">
                 <div className="dash-card-title">ยืนยันการส่งคำขอ</div>
                 <div className="dash-card-sub">ตรวจสอบข้อมูลก่อนส่ง</div>
@@ -1519,7 +1493,7 @@ function UpgradePage({ onNavigate, notify }) {
                 </div>
                 <div className="alert alert-warn" style={{ marginBottom: 20 }}>⚠️ เมื่อส่งแล้วจะไม่สามารถแก้ไขเอกสารได้ กรุณาตรวจสอบให้เรียบร้อย</div>
                 <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-                  <button className="btn btn-ghost btn-sm" onClick={() => setStep(2)}>← ย้อนกลับ</button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setStep(1)}>← ย้อนกลับ</button>
                   <button className="btn btn-primary" onClick={handleSubmit}>📩 ส่งคำขอ</button>
                 </div>
               </div>
@@ -1562,6 +1536,7 @@ export default function App() {
       <style>{styles}</style>
       <Navbar user={user} onNavigate={navigate} darkMode={darkMode} toggleDark={() => setDarkMode(d => !d)} currentPage={page} />
       {page === "home"        && <HomePage key={homeKey} onNavigate={navigate} />}
+      {page === "about"       && <AboutPage onNavigate={navigate} />}
       {page === "shop-list"   && <ShopListPage onNavigate={navigate} />}
       {page === "shop-detail" && pageData && <ShopDetailPage shop={pageData} user={user} onNavigate={navigate} notify={notify} />}
       {page === "profile"     && user && <ProfilePage user={user} onNavigate={navigate} />}

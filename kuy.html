@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OSSD14 — Mock Data</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Thai:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#f5f7fa; --white:#ffffff; --border:#e2e8f0; --border2:#cbd5e1;
+    --text:#1e293b; --text-sub:#475569; --text-dim:#94a3b8;
+    --mono:'IBM Plex Mono',monospace; --body:'Noto Sans Thai',sans-serif;
+    --active-color:#64748b;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;} html{scroll-behavior:smooth;}
+  body{background:var(--bg);color:var(--text);font-family:var(--body);min-height:100vh;display:flex;flex-direction:column;}
+
+  /* NAV */
+  nav{position:sticky;top:0;z-index:200;background:var(--white);border-bottom:1px solid var(--border);
+    box-shadow:0 1px 8px rgba(0,0,0,0.06);display:flex;align-items:stretch;height:56px;padding:0 24px;}
+  .nav-brand{display:flex;align-items:center;gap:10px;padding-right:24px;border-right:1px solid var(--border);
+    margin-right:8px;flex-shrink:0;}
+  .nav-brand-dot{width:10px;height:10px;border-radius:50%;background:var(--active-color);transition:background .3s;}
+  .nav-brand-text{font-family:var(--mono);font-size:13px;font-weight:500;color:var(--text);}
+  .nav-tabs{display:flex;align-items:stretch;gap:2px;overflow-x:auto;scrollbar-width:none;}
+  .nav-tabs::-webkit-scrollbar{display:none;}
+  .nav-tab{display:flex;align-items:center;gap:7px;padding:0 16px;font-family:var(--mono);font-size:12px;
+    color:var(--text-dim);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap;user-select:none;}
+  .nav-tab:hover{color:var(--text-sub);}
+  .nav-tab.active{color:var(--active-color);border-bottom-color:var(--active-color);font-weight:500;}
+  .tab-dot{width:7px;height:7px;border-radius:50%;opacity:.4;flex-shrink:0;}
+  .nav-tab.active .tab-dot{opacity:1;}
+  .nav-count{font-size:10px;background:var(--bg);border:1px solid var(--border2);border-radius:10px;padding:1px 7px;color:var(--text-dim);}
+  .nav-tab.active .nav-count{background:color-mix(in srgb,var(--active-color) 10%,white);
+    border-color:color-mix(in srgb,var(--active-color) 30%,white);color:var(--active-color);}
+
+  /* PAGES */
+  .page{display:none;flex:1;animation:fadeIn .2s ease;}
+  .page.active{display:block;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  /* HERO */
+  .page-hero{padding:32px 40px 24px;border-bottom:1px solid var(--border);background:var(--white);}
+  .page-hero-top{display:flex;align-items:flex-start;gap:16px;}
+  .hero-icon{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+  .hero-content h1{font-family:var(--mono);font-size:20px;font-weight:500;color:var(--text);margin-bottom:5px;}
+  .hero-content p{font-size:14px;color:var(--text-sub);line-height:1.65;max-width:680px;}
+  .hero-pills{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;}
+  .pill{font-family:var(--mono);font-size:11px;padding:4px 12px;border-radius:20px;border:1px solid var(--border2);color:var(--text-sub);background:var(--bg);}
+
+  /* BODY */
+  .page-body{padding:28px 40px 60px;display:flex;flex-direction:column;gap:32px;}
+
+  /* SECTION */
+  .t-section{display:flex;flex-direction:column;gap:10px;}
+  .t-label{display:flex;align-items:center;gap:10px;}
+  .t-bar{width:3px;height:16px;border-radius:2px;flex-shrink:0;}
+  .t-name{font-family:var(--mono);font-size:13px;font-weight:500;color:var(--text);}
+  .t-desc{font-size:12px;color:var(--text-dim);}
+
+  /* SCHEMA GRID — column definitions */
+  .schema-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px;}
+  .col-card{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px 14px;border-left:3px solid transparent;}
+  .col-card-top{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+  .col-card-name{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--text);}
+  .col-card-pk{font-family:var(--mono);font-size:9px;padding:1px 6px;border-radius:3px;background:#fef9c3;color:#a16207;border:1px solid #fde68a;}
+  .col-card-fk{font-family:var(--mono);font-size:9px;padding:1px 6px;border-radius:3px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;}
+  .col-card-nn{font-family:var(--mono);font-size:9px;padding:1px 6px;border-radius:3px;background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;}
+  .col-card-type{font-family:var(--mono);font-size:11px;color:var(--active-color);margin-bottom:4px;}
+  .col-card-desc{font-size:12px;color:var(--text-sub);line-height:1.5;}
+  .col-card-example{margin-top:6px;font-family:var(--mono);font-size:11px;color:#6d28d9;background:#faf5ff;border:1px solid #ddd6fe;border-radius:5px;padding:3px 8px;display:inline-block;}
+
+  /* DATA TABLE */
+  .t-wrap{background:var(--white);border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+  .t-wrap table{width:100%;border-collapse:collapse;font-size:13px;}
+  thead th{background:#f8fafc;padding:10px 14px;text-align:left;font-family:var(--mono);font-size:10px;
+    letter-spacing:.8px;color:var(--text-dim);text-transform:uppercase;border-bottom:1px solid var(--border);white-space:nowrap;}
+  tbody tr{border-bottom:1px solid #f1f5f9;transition:background .12s;}
+  tbody tr:last-child{border-bottom:none;}
+  tbody tr:hover{background:#f8fafc;}
+  td{padding:10px 14px;color:var(--text-sub);vertical-align:middle;}
+  td.m{font-family:var(--mono);font-size:12px;color:var(--text);}
+  td.null{font-family:var(--mono);font-size:12px;color:#c8d5e0;font-style:italic;}
+  td.masked{font-family:var(--mono);font-size:12px;color:#c8d5e0;letter-spacing:2px;}
+  td.url{font-family:var(--mono);font-size:11px;color:#94a3b8;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+  /* BADGES */
+  .b{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:6px;font-family:var(--mono);font-size:11px;font-weight:500;white-space:nowrap;}
+  .bd{width:6px;height:6px;border-radius:50%;}
+  .green{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;}
+  .blue{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;}
+  .sky{background:#f0f9ff;color:#0369a1;border:1px solid #bae6fd;}
+  .red{background:#fff1f2;color:#be123c;border:1px solid #fecdd3;}
+  .orange{background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;}
+  .yellow{background:#fefce8;color:#a16207;border:1px solid #fde68a;}
+  .purple{background:#faf5ff;color:#6d28d9;border:1px solid #ddd6fe;}
+  .gray{background:#f8fafc;color:#475569;border:1px solid #e2e8f0;}
+  .teal{background:#f0fdfa;color:#0f766e;border:1px solid #99f6e4;}
+
+  /* NOTE */
+  .note{padding:12px 16px;border-radius:8px;font-size:13px;color:var(--text-sub);line-height:1.65;
+    display:flex;gap:10px;align-items:flex-start;border:1px solid var(--border);background:var(--white);}
+  .note-ic{flex-shrink:0;margin-top:1px;}
+  code{font-family:var(--mono);background:#f1f5f9;padding:1px 6px;border-radius:3px;font-size:12px;color:var(--text);}
+
+  /* RELATIONS */
+  .relations{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:16px 20px;display:flex;flex-direction:column;gap:8px;}
+  .rel{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-sub);}
+  .rel-from{font-family:var(--mono);font-size:11.5px;color:var(--text);background:#f1f5f9;padding:2px 8px;border-radius:4px;}
+  .rel-arrow{color:var(--text-dim);}
+  .rel-to{font-family:var(--mono);font-size:11.5px;}
+
+  /* SUMMARY CARDS */
+  .sum-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;padding:28px 40px 0;}
+  .sum-card{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:18px 20px;
+    cursor:pointer;transition:all .18s;border-top:3px solid transparent;}
+  .sum-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.08);transform:translateY(-2px);}
+  .sc-name{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--text);margin-bottom:4px;}
+  .sc-num{font-size:30px;font-weight:700;line-height:1.1;margin-bottom:2px;}
+  .sc-lbl{font-size:11px;color:var(--text-dim);margin-bottom:8px;}
+  .sc-desc{font-size:12px;color:var(--text-sub);line-height:1.5;}
+
+  /* DIVIDER LABEL */
+  .section-divider{font-family:var(--mono);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;
+    color:var(--text-dim);padding:4px 0 8px;border-bottom:1px solid var(--border);margin-bottom:4px;}
+
+  footer{border-top:1px solid var(--border);padding:14px 40px;display:flex;justify-content:space-between;
+    align-items:center;background:var(--white);margin-top:auto;}
+  .ft{font-family:var(--mono);font-size:11px;color:var(--text-dim);}
+
+  @media(max-width:640px){
+    .page-hero,.page-body{padding-left:16px;padding-right:16px;}
+    .sum-grid{padding:16px;}
+    nav{padding:0 12px;}
+    .nav-brand-text{display:none;}
+    .schema-grid{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">
+    <div class="nav-brand-dot" id="brand-dot"></div>
+    <span class="nav-brand-text">ossd14</span>
+  </div>
+  <div class="nav-tabs">
+    <div class="nav-tab active" data-page="overview" data-color="#64748b">
+      <span class="tab-dot" style="background:#64748b"></span>overview
+    </div>
+    <div class="nav-tab" data-page="accounts" data-color="#2563eb">
+      <span class="tab-dot" style="background:#2563eb"></span>accounts<span class="nav-count">3</span>
+    </div>
+    <div class="nav-tab" data-page="admins" data-color="#7c3aed">
+      <span class="tab-dot" style="background:#7c3aed"></span>admins<span class="nav-count">2</span>
+    </div>
+    <div class="nav-tab" data-page="shops" data-color="#0891b2">
+      <span class="tab-dot" style="background:#0891b2"></span>shops<span class="nav-count">3</span>
+    </div>
+    <div class="nav-tab" data-page="requests" data-color="#d97706">
+      <span class="tab-dot" style="background:#d97706"></span>requests<span class="nav-count">3×3</span>
+    </div>
+    <div class="nav-tab" data-page="attachments" data-color="#0f766e">
+      <span class="tab-dot" style="background:#0f766e"></span>attachments<span class="nav-count">3</span>
+    </div>
+    <div class="nav-tab" data-page="logs" data-color="#dc2626">
+      <span class="tab-dot" style="background:#dc2626"></span>logs &amp; blacklist<span class="nav-count">2</span>
+    </div>
+  </div>
+</nav>
+
+<!-- ══ OVERVIEW ═══════════════════════════════════ -->
+<div class="page active" id="page-overview">
+  <div class="page-hero">
+    <div class="page-hero-top">
+      <div class="hero-icon" style="background:#f1f5f9">🗄️</div>
+      <div class="hero-content">
+        <h1>Mock Data Overview</h1>
+        <p>ข้อมูลจำลองทั้งหมด 9 ตาราง · Schema จาก MySQL Workbench Forward Engineering · INSERT ตามลำดับเพื่อหลีกเลี่ยง Foreign Key Error</p>
+      </div>
+    </div>
+    <div class="hero-pills">
+      <span class="pill">9 tables</span>
+      <span class="pill">MySQL · ossd14</span>
+      <span class="pill" style="color:#b45309;border-color:#fde68a;background:#fffbeb">⚠️ รันตามลำดับบนลงล่าง</span>
+    </div>
+  </div>
+  <div class="sum-grid">
+    <div class="sum-card" style="border-top-color:#2563eb" onclick="switchPage('accounts','#2563eb')">
+      <div class="sc-name">accounts</div><div class="sc-num" style="color:#2563eb">3</div>
+      <div class="sc-lbl">rows · 9 columns</div><div class="sc-desc">ผู้ใช้งาน — บุคคล & บริษัท</div>
+    </div>
+    <div class="sum-card" style="border-top-color:#7c3aed" onclick="switchPage('admins','#7c3aed')">
+      <div class="sc-name">admins</div><div class="sc-num" style="color:#7c3aed">2</div>
+      <div class="sc-lbl">rows · 8 columns</div><div class="sc-desc">Super Admin & Moderator</div>
+    </div>
+    <div class="sum-card" style="border-top-color:#0891b2" onclick="switchPage('shops','#0891b2')">
+      <div class="sc-name">shops</div><div class="sc-num" style="color:#0891b2">3</div>
+      <div class="sc-lbl">rows · 12 columns</div><div class="sc-desc">NORMAL · VERIFIED · BLACKLISTED</div>
+    </div>
+    <div class="sum-card" style="border-top-color:#d97706" onclick="switchPage('requests','#d97706')">
+      <div class="sc-name">requests (3 tables)</div><div class="sc-num" style="color:#d97706">3</div>
+      <div class="sc-lbl">rows each</div><div class="sc-desc">upgrade / report / claim</div>
+    </div>
+    <div class="sum-card" style="border-top-color:#0f766e" onclick="switchPage('attachments','#0f766e')">
+      <div class="sc-name">attachments</div><div class="sc-num" style="color:#0f766e">3</div>
+      <div class="sc-lbl">rows · 6 columns</div><div class="sc-desc">ไฟล์แนบหลักฐาน</div>
+    </div>
+    <div class="sum-card" style="border-top-color:#dc2626" onclick="switchPage('logs','#dc2626')">
+      <div class="sc-name">logs &amp; blacklist</div><div class="sc-num" style="color:#dc2626">2</div>
+      <div class="sc-lbl">tables · 1 row each</div><div class="sc-desc">approval logs & blacklist</div>
+    </div>
+  </div>
+  <div class="page-body">
+    <div class="t-section">
+      <div class="t-label"><div class="t-bar" style="background:#64748b"></div>
+        <span class="t-name">Foreign Key Relations</span></div>
+      <div class="relations">
+        <div class="rel"><span class="rel-from">shops.owner_account_id</span><span class="rel-arrow">→</span><span class="rel-to" style="color:#2563eb">accounts.id</span><span style="font-size:12px;color:#94a3b8">ON DELETE CASCADE</span></div>
+        <div class="rel"><span class="rel-from">upgrade_requests.account_id</span><span class="rel-arrow">→</span><span class="rel-to" style="color:#2563eb">accounts.id</span><span style="font-size:12px;color:#94a3b8">ON DELETE CASCADE</span></div>
+        <div class="rel"><span class="rel-from">upgrade_requests.shop_ref_id</span><span class="rel-arrow">→</span><span class="rel-to" style="color:#0891b2">shops.ref_id</span><span style="font-size:12px;color:#94a3b8">ON DELETE CASCADE</span></div>
+        <div class="rel"><span class="rel-from">report_requests.reporter_account_id</span><span class="rel-arrow">→</span><span class="rel-to" style="color:#2563eb">accounts.id</span><span style="font-size:12px;color:#94a3b8">ON DELETE CASCADE</span></div>
+        <div class="rel"><span class="rel-from">report_requests.reported_shop_ref_id</span><span class="rel-arrow">→</span><span class="rel-to" style="color:#0891b2">shops.ref_id</span><span style="font-size:12px;color:#94a3b8">ON DELETE CASCADE</span></div>
+        <div class="rel"><span class="rel-from">claim_requests.claimer_account_id</span><span class="rel-arrow">→</span><span class="rel-to" style="color:#2563eb">accounts.id</span><span style="font-size:12px;color:#94a3b8">ON DELETE CASCADE</span></div>
+        <div class="rel"><span class="rel-from">claim_requests.shop_ref_id</span><span class="rel-arrow">→</span><span class="rel-to" style="color:#0891b2">shops.ref_id</span><span style="font-size:12px;color:#94a3b8">ON DELETE CASCADE</span></div>
+        <div class="rel"><span class="rel-from">attachments.*_request_id</span><span class="rel-arrow">→</span><span class="rel-to" style="color:#d97706">upgrade / report / claim requests</span><span style="font-size:12px;color:#94a3b8">ON DELETE CASCADE</span></div>
+        <div class="rel"><span class="rel-from">upgrade_approval_logs.upgrade_request_id</span><span class="rel-arrow">→</span><span class="rel-to" style="color:#d97706">upgrade_requests.id</span><span style="font-size:12px;color:#94a3b8">ON DELETE CASCADE</span></div>
+        <div class="rel"><span class="rel-from">upgrade_approval_logs.admin_id</span><span class="rel-arrow">→</span><span class="rel-to" style="color:#7c3aed">admins.id</span></div>
+        <div class="rel"><span class="rel-from">blacklists.shop_ref_id</span><span class="rel-arrow">→</span><span class="rel-to" style="color:#0891b2">shops.ref_id</span><span style="font-size:12px;color:#94a3b8">ON DELETE CASCADE</span></div>
+        <div class="rel"><span class="rel-from">blacklists.admin_id</span><span class="rel-arrow">→</span><span class="rel-to" style="color:#7c3aed">admins.id</span></div>
+        <div class="rel"><span class="rel-from">blacklists.report_request_id</span><span class="rel-arrow">→</span><span class="rel-to" style="color:#dc2626">report_requests.id</span><span style="font-size:12px;color:#94a3b8">ON DELETE SET NULL</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ACCOUNTS ══════════════════════════════════ -->
+<div class="page" id="page-accounts">
+  <div class="page-hero">
+    <div class="page-hero-top">
+      <div class="hero-icon" style="background:#eff6ff">👤</div>
+      <div class="hero-content">
+        <h1 style="color:#1d4ed8">accounts</h1>
+        <p>ผู้ใช้งานในระบบ ทั้งบุคคลธรรมดาและนิติบุคคล · PK เป็น VARCHAR(24) กำหนดเอง เช่น ACC001</p>
+      </div>
+    </div>
+    <div class="hero-pills"><span class="pill">9 columns</span><span class="pill">PK: id VARCHAR(24)</span><span class="pill">Engine: InnoDB · utf8mb4</span></div>
+  </div>
+  <div class="page-body">
+    <div class="t-section">
+      <div class="section-divider">Column Definitions</div>
+      <div class="schema-grid">
+        <div class="col-card" style="border-left-color:#f59e0b">
+          <div class="col-card-top"><span class="col-card-name">id</span><span class="col-card-pk">PK</span><span class="col-card-nn">NOT NULL</span></div>
+          <div class="col-card-type">VARCHAR(24)</div>
+          <div class="col-card-desc">รหัสผู้ใช้ กำหนดเองจากระบบ ไม่ใช่ Auto Increment</div>
+          <span class="col-card-example">'ACC001'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#2563eb">
+          <div class="col-card-top"><span class="col-card-name">email</span><span class="col-card-nn">NOT NULL</span></div>
+          <div class="col-card-type">VARCHAR(255)</div>
+          <div class="col-card-desc">อีเมลผู้ใช้งาน ใช้ login</div>
+          <span class="col-card-example">'somchai@email.com'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#64748b">
+          <div class="col-card-top"><span class="col-card-name">phone_number</span></div>
+          <div class="col-card-type">VARCHAR(20) · NULL</div>
+          <div class="col-card-desc">เบอร์โทรศัพท์ ไม่บังคับ</div>
+          <span class="col-card-example">'0811111111'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#64748b">
+          <div class="col-card-top"><span class="col-card-name">bank_name</span></div>
+          <div class="col-card-type">VARCHAR(50) · NULL</div>
+          <div class="col-card-desc">ชื่อธนาคาร เช่น KBANK, SCB, BBL</div>
+          <span class="col-card-example">'KBANK'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#64748b">
+          <div class="col-card-top"><span class="col-card-name">bank_branch_code</span></div>
+          <div class="col-card-type">VARCHAR(10) · NULL</div>
+          <div class="col-card-desc">รหัสสาขาธนาคาร (บางธนาคารต้องระบุ)</div>
+          <span class="col-card-example">'001'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#64748b">
+          <div class="col-card-top"><span class="col-card-name">bank_account_holder_name</span></div>
+          <div class="col-card-type">VARCHAR(255) · NULL</div>
+          <div class="col-card-desc">ชื่อเจ้าของบัญชีธนาคาร ตรงตามหน้าบัตร</div>
+          <span class="col-card-example">'นาย สมชาย ใจดี'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#64748b">
+          <div class="col-card-top"><span class="col-card-name">bank_account_number</span></div>
+          <div class="col-card-type">VARCHAR(20) · NULL</div>
+          <div class="col-card-desc">เลขที่บัญชีธนาคาร</div>
+          <span class="col-card-example">'1234567890'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#64748b">
+          <div class="col-card-top"><span class="col-card-name">bank_image_url</span></div>
+          <div class="col-card-type">TEXT · NULL</div>
+          <div class="col-card-desc">URL รูปภาพหน้าบัญชีธนาคาร / bookbank</div>
+          <span class="col-card-example">'https://storage.../bankbook.jpg'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#64748b">
+          <div class="col-card-top"><span class="col-card-name">is_company</span></div>
+          <div class="col-card-type">TINYINT(1) · DEFAULT 0</div>
+          <div class="col-card-desc">0 = บุคคลธรรมดา · 1 = นิติบุคคล/บริษัท</div>
+          <span class="col-card-example">0 หรือ 1</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="t-section">
+      <div class="section-divider">Mock Data (3 rows)</div>
+      <div class="t-wrap" style="overflow-x:auto">
+        <table>
+          <thead><tr>
+            <th>id</th><th>email</th><th>phone_number</th><th>bank_name</th>
+            <th>bank_branch_code</th><th>bank_account_holder_name</th>
+            <th>bank_account_number</th><th>bank_image_url</th><th>is_company</th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td class="m">ACC001</td><td>somchai@email.com</td><td class="m">0811111111</td>
+              <td><span class="b green">KBANK</span></td>
+              <td class="m">001</td><td>นาย สมชาย ใจดี</td><td class="m">1234567890</td>
+              <td class="url">…/id_card_somchai.jpg</td>
+              <td><span class="b gray">0</span></td>
+            </tr>
+            <tr>
+              <td class="m">ACC002</td><td>company@email.com</td><td class="m">022222222</td>
+              <td><span class="b purple">SCB</span></td>
+              <td class="null">NULL</td><td>บจก. ค้าขายร่ำรวย</td><td class="m">0987654321</td>
+              <td class="null">NULL</td>
+              <td><span class="b blue">1</span></td>
+            </tr>
+            <tr>
+              <td class="m">ACC003</td><td>customer@email.com</td><td class="m">0833333333</td>
+              <td><span class="b orange">BBL</span></td>
+              <td class="null">NULL</td><td>นางสาว สมหญิง รักซื้อ</td><td class="m">1112223334</td>
+              <td class="null">NULL</td>
+              <td><span class="b gray">0</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ADMINS ═════════════════════════════════════ -->
+<div class="page" id="page-admins">
+  <div class="page-hero">
+    <div class="page-hero-top">
+      <div class="hero-icon" style="background:#faf5ff">🛡️</div>
+      <div class="hero-content">
+        <h1 style="color:#6d28d9">admins</h1>
+        <p>ผู้ดูแลระบบ · AUTO_INCREMENT เริ่มจาก 2 · มี UNIQUE INDEX บน username</p>
+      </div>
+    </div>
+    <div class="hero-pills"><span class="pill">8 columns</span><span class="pill">PK: id INT AUTO_INCREMENT</span><span class="pill">UNIQUE: username</span></div>
+  </div>
+  <div class="page-body">
+    <div class="t-section">
+      <div class="section-divider">Column Definitions</div>
+      <div class="schema-grid">
+        <div class="col-card" style="border-left-color:#f59e0b">
+          <div class="col-card-top"><span class="col-card-name">id</span><span class="col-card-pk">PK</span><span class="col-card-nn">NOT NULL</span></div>
+          <div class="col-card-type">INT AUTO_INCREMENT (เริ่ม 2)</div>
+          <div class="col-card-desc">รหัสแอดมิน สร้างอัตโนมัติ</div>
+          <span class="col-card-example">1, 2, 3 …</span>
+        </div>
+        <div class="col-card" style="border-left-color:#7c3aed">
+          <div class="col-card-top"><span class="col-card-name">username</span><span class="col-card-nn">NOT NULL</span></div>
+          <div class="col-card-type">VARCHAR(50) · UNIQUE</div>
+          <div class="col-card-desc">ชื่อผู้ใช้ ต้องไม่ซ้ำกัน ใช้ login เข้าหน้า admin</div>
+          <span class="col-card-example">'admin_super'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#7c3aed">
+          <div class="col-card-top"><span class="col-card-name">password_hash</span><span class="col-card-nn">NOT NULL</span></div>
+          <div class="col-card-type">VARCHAR(255)</div>
+          <div class="col-card-desc">รหัสผ่านที่ผ่านการ Hash แล้ว (bcrypt/argon2)</div>
+          <span class="col-card-example">'$2b$10$xxxx…'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#7c3aed">
+          <div class="col-card-top"><span class="col-card-name">full_name</span><span class="col-card-nn">NOT NULL</span></div>
+          <div class="col-card-type">VARCHAR(100)</div>
+          <div class="col-card-desc">ชื่อ-นามสกุลจริงของแอดมิน</div>
+          <span class="col-card-example">'หัวหน้า แอดมิน'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#dc2626">
+          <div class="col-card-top"><span class="col-card-name">role</span></div>
+          <div class="col-card-type">ENUM · DEFAULT 'MODERATOR'</div>
+          <div class="col-card-desc">ระดับสิทธิ์ · SUPER_ADMIN มีสิทธิ์สูงสุด</div>
+          <span class="col-card-example">'SUPER_ADMIN' / 'MODERATOR'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#64748b">
+          <div class="col-card-top"><span class="col-card-name">is_active</span></div>
+          <div class="col-card-type">TINYINT(1) · DEFAULT 1</div>
+          <div class="col-card-desc">1 = ใช้งานอยู่ · 0 = ระงับบัญชีแล้ว</div>
+          <span class="col-card-example">1</span>
+        </div>
+        <div class="col-card" style="border-left-color:#64748b">
+          <div class="col-card-top"><span class="col-card-name">last_login</span></div>
+          <div class="col-card-type">DATETIME · NULL</div>
+          <div class="col-card-desc">เวลา login ล่าสุด อัปเดตทุกครั้งที่เข้าระบบ</div>
+          <span class="col-card-example">'2026-03-18 10:30:00'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#64748b">
+          <div class="col-card-top"><span class="col-card-name">created_at</span></div>
+          <div class="col-card-type">DATETIME · DEFAULT CURRENT_TIMESTAMP</div>
+          <div class="col-card-desc">วันที่สร้างบัญชีแอดมิน บันทึกอัตโนมัติ</div>
+          <span class="col-card-example">'2026-01-01 09:00:00'</span>
+        </div>
+      </div>
+    </div>
+    <div class="t-section">
+      <div class="section-divider">Mock Data (2 rows)</div>
+      <div class="t-wrap" style="overflow-x:auto">
+        <table>
+          <thead><tr><th>id</th><th>username</th><th>password_hash</th><th>full_name</th><th>role</th><th>is_active</th><th>last_login</th><th>created_at</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="m">1</td><td class="m">admin_super</td>
+              <td class="masked">••••••••••</td>
+              <td>หัวหน้า แอดมิน</td>
+              <td><span class="b red">SUPER_ADMIN</span></td>
+              <td><span class="b green">1</span></td>
+              <td class="m" style="font-size:11px">2026-03-18 09:00</td>
+              <td class="m" style="font-size:11px">2026-01-01 09:00</td>
+            </tr>
+            <tr>
+              <td class="m">2</td><td class="m">admin_mod</td>
+              <td class="masked">••••••••••</td>
+              <td>พนักงาน ตรวจสอบ</td>
+              <td><span class="b blue">MODERATOR</span></td>
+              <td><span class="b green">1</span></td>
+              <td class="null">NULL</td>
+              <td class="m" style="font-size:11px">2026-01-15 09:00</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><span class="note-ic">🔒</span><span>password_hash จริงคือ <code>hashed_pwd_1</code> / <code>hashed_pwd_2</code> ในไฟล์ mock · production ควรใช้ bcrypt</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SHOPS ═══════════════════════════════════════ -->
+<div class="page" id="page-shops">
+  <div class="page-hero">
+    <div class="page-hero-top">
+      <div class="hero-icon" style="background:#f0f9ff">🏪</div>
+      <div class="hero-content">
+        <h1 style="color:#0369a1">shops</h1>
+        <p>ร้านค้าทั้งหมด · PK เป็น VARCHAR ไม่ใช่ int · SHOP003 ไม่มีเจ้าของ (owner_account_id = NULL) และโดนแบน</p>
+      </div>
+    </div>
+    <div class="hero-pills"><span class="pill">12 columns</span><span class="pill">PK: ref_id VARCHAR(50)</span><span class="pill">FK → accounts</span></div>
+  </div>
+  <div class="page-body">
+    <div class="t-section">
+      <div class="section-divider">Column Definitions</div>
+      <div class="schema-grid">
+        <div class="col-card" style="border-left-color:#f59e0b">
+          <div class="col-card-top"><span class="col-card-name">ref_id</span><span class="col-card-pk">PK</span><span class="col-card-nn">NOT NULL</span></div>
+          <div class="col-card-type">VARCHAR(50)</div>
+          <div class="col-card-desc">รหัสร้านค้า กำหนดจากระบบต้นทาง</div>
+          <span class="col-card-example">'SHOP001'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#0891b2">
+          <div class="col-card-top"><span class="col-card-name">name</span><span class="col-card-nn">NOT NULL</span></div>
+          <div class="col-card-type">VARCHAR(255)</div>
+          <div class="col-card-desc">ชื่อร้านค้า</div>
+          <span class="col-card-example">'สมชาย การเกษตร'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#64748b">
+          <div class="col-card-top"><span class="col-card-name">channel</span></div>
+          <div class="col-card-type">VARCHAR(50) · NULL</div>
+          <div class="col-card-desc">ช่องทางที่ร้านขาย เช่น Shopee, Facebook, Line</div>
+          <span class="col-card-example">'Shopee'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#64748b">
+          <div class="col-card-top"><span class="col-card-name">created_at</span></div>
+          <div class="col-card-type">DATETIME · NULL</div>
+          <div class="col-card-desc">วันที่ร้านถูกสร้างในระบบ</div>
+          <span class="col-card-example">'2025-06-01 00:00:00'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#64748b">
+          <div class="col-card-top"><span class="col-card-name">updated_at</span></div>
+          <div class="col-card-type">DATETIME · NULL</div>
+          <div class="col-card-desc">วันที่ข้อมูลร้านถูกแก้ไขล่าสุด</div>
+          <span class="col-card-example">'2026-03-18 10:00:00'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#64748b">
+          <div class="col-card-top"><span class="col-card-name">owner_email</span></div>
+          <div class="col-card-type">VARCHAR(255) · NULL</div>
+          <div class="col-card-desc">อีเมลเจ้าของร้านที่ดึงมาจากระบบต้นทาง</div>
+          <span class="col-card-example">'somchai@email.com'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#64748b">
+          <div class="col-card-top"><span class="col-card-name">owner_name</span></div>
+          <div class="col-card-type">VARCHAR(255) · NULL</div>
+          <div class="col-card-desc">ชื่อเจ้าของร้านจากระบบต้นทาง (ก่อน claim)</div>
+          <span class="col-card-example">'นาย สมชาย ใจดี'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#2563eb">
+          <div class="col-card-top"><span class="col-card-name">owner_account_id</span><span class="col-card-fk">FK</span></div>
+          <div class="col-card-type">VARCHAR(24) · NULL → accounts.id</div>
+          <div class="col-card-desc">รหัส accounts ของเจ้าของ · NULL = ยังไม่มีเจ้าของ</div>
+          <span class="col-card-example">'ACC001' หรือ NULL</span>
+        </div>
+        <div class="col-card" style="border-left-color:#64748b">
+          <div class="col-card-top"><span class="col-card-name">url</span></div>
+          <div class="col-card-type">TEXT · NULL</div>
+          <div class="col-card-desc">URL ลิงก์ร้านค้าในแพลตฟอร์ม</div>
+          <span class="col-card-example">'https://shopee.co.th/shop/123'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#0891b2">
+          <div class="col-card-top"><span class="col-card-name">shop_status</span><span class="col-card-nn">NOT NULL</span></div>
+          <div class="col-card-type">ENUM · DEFAULT 'NORMAL'</div>
+          <div class="col-card-desc">NORMAL = ปกติ · VERIFIED = ยืนยันแล้ว · BLACKLISTED = ถูกแบน</div>
+          <span class="col-card-example">'NORMAL'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#64748b">
+          <div class="col-card-top"><span class="col-card-name">is_active</span><span class="col-card-nn">NOT NULL</span></div>
+          <div class="col-card-type">TINYINT(1) · DEFAULT 1</div>
+          <div class="col-card-desc">1 = ร้านเปิดอยู่ · 0 = ปิดร้านแล้ว</div>
+          <span class="col-card-example">1</span>
+        </div>
+        <div class="col-card" style="border-left-color:#64748b">
+          <div class="col-card-top"><span class="col-card-name">failed_upgrade_count</span><span class="col-card-nn">NOT NULL</span></div>
+          <div class="col-card-type">INT · DEFAULT 0</div>
+          <div class="col-card-desc">จำนวนครั้งที่ขอ Verified แล้วถูกปฏิเสธสะสม</div>
+          <span class="col-card-example">0, 1, 2 …</span>
+        </div>
+      </div>
+    </div>
+    <div class="t-section">
+      <div class="section-divider">Mock Data (3 rows)</div>
+      <div class="t-wrap" style="overflow-x:auto">
+        <table>
+          <thead><tr>
+            <th>ref_id</th><th>name</th><th>channel</th><th>owner_email</th><th>owner_name</th>
+            <th>owner_account_id</th><th>url</th><th>shop_status</th><th>is_active</th><th>failed_upgrade_count</th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td class="m">SHOP001</td><td>สมชาย การเกษตร</td>
+              <td><span class="b teal">Shopee</span></td>
+              <td style="font-size:12px">somchai@email.com</td><td>นาย สมชาย ใจดี</td>
+              <td class="m" style="color:#2563eb">ACC001</td>
+              <td class="url">shopee.co.th/shop/001</td>
+              <td><span class="b gray">NORMAL</span></td>
+              <td><span class="b green">1</span></td><td class="m">1</td>
+            </tr>
+            <tr>
+              <td class="m">SHOP002</td><td>ริชชี่ ช้อป</td>
+              <td><span class="b blue">Facebook</span></td>
+              <td style="font-size:12px">company@email.com</td><td>บจก. ค้าขายร่ำรวย</td>
+              <td class="m" style="color:#2563eb">ACC002</td>
+              <td class="url">fb.com/richyshop</td>
+              <td><span class="b blue">VERIFIED</span></td>
+              <td><span class="b green">1</span></td><td class="m">0</td>
+            </tr>
+            <tr style="background:#fff5f5">
+              <td class="m">SHOP003</td><td>ร้านขายของ ถูกที่สุดในโลก</td>
+              <td class="null">NULL</td>
+              <td class="null">NULL</td><td class="null">NULL</td>
+              <td class="null">NULL</td>
+              <td class="null">NULL</td>
+              <td><span class="b red">BLACKLISTED</span></td>
+              <td><span class="b green">1</span></td><td class="m">0</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><span class="note-ic">⚠️</span><span>SHOP003 ทุก field เกี่ยวกับเจ้าของเป็น NULL · สถานะถูก UPDATE เป็น BLACKLISTED หลัง INSERT blacklists</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ REQUESTS ════════════════════════════════════ -->
+<div class="page" id="page-requests">
+  <div class="page-hero">
+    <div class="page-hero-top">
+      <div class="hero-icon" style="background:#fffbeb">📋</div>
+      <div class="hero-content">
+        <h1 style="color:#b45309">requests (3 tables)</h1>
+        <p>คำร้องขอ 3 ประเภท ทุกตารางมี created_at, updated_at อัตโนมัติ และ status เริ่มต้น 'pending'</p>
+      </div>
+    </div>
+    <div class="hero-pills"><span class="pill">3 tables</span><span class="pill">PK: id INT AUTO_INCREMENT</span><span class="pill">status default: 'pending'</span></div>
+  </div>
+  <div class="page-body">
+
+    <!-- upgrade_requests -->
+    <div class="t-section">
+      <div class="section-divider">upgrade_requests — คำขอเลื่อนขั้นเป็น Verified</div>
+      <div class="schema-grid">
+        <div class="col-card" style="border-left-color:#f59e0b">
+          <div class="col-card-top"><span class="col-card-name">id</span><span class="col-card-pk">PK</span></div>
+          <div class="col-card-type">INT AUTO_INCREMENT</div>
+          <div class="col-card-desc">รหัสคำขอ</div><span class="col-card-example">1</span>
+        </div>
+        <div class="col-card" style="border-left-color:#2563eb">
+          <div class="col-card-top"><span class="col-card-name">account_id</span><span class="col-card-fk">FK</span><span class="col-card-nn">NOT NULL</span></div>
+          <div class="col-card-type">VARCHAR(24) → accounts.id</div>
+          <div class="col-card-desc">ผู้ยื่นคำขอ</div><span class="col-card-example">'ACC001'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#0891b2">
+          <div class="col-card-top"><span class="col-card-name">shop_ref_id</span><span class="col-card-fk">FK</span><span class="col-card-nn">NOT NULL</span></div>
+          <div class="col-card-type">VARCHAR(50) → shops.ref_id</div>
+          <div class="col-card-desc">ร้านที่ต้องการ Upgrade</div><span class="col-card-example">'SHOP001'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#64748b">
+          <div class="col-card-top"><span class="col-card-name">document_url</span></div>
+          <div class="col-card-type">TEXT · NULL</div>
+          <div class="col-card-desc">URL เอกสารที่แนบมากับคำขอ (บัตรประชาชน ฯลฯ)</div><span class="col-card-example">'https://storage.../doc.pdf'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#d97706">
+          <div class="col-card-top"><span class="col-card-name">status</span></div>
+          <div class="col-card-type">VARCHAR(20) · DEFAULT 'pending'</div>
+          <div class="col-card-desc">pending / approved / rejected</div><span class="col-card-example">'pending'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#64748b">
+          <div class="col-card-top"><span class="col-card-name">admin_remark</span></div>
+          <div class="col-card-type">TEXT · NULL</div>
+          <div class="col-card-desc">หมายเหตุจากแอดมิน เช่น ขอเอกสารเพิ่ม</div><span class="col-card-example">'รูปเบลอ ส่งใหม่ด้วยครับ'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#64748b">
+          <div class="col-card-top"><span class="col-card-name">created_at / updated_at</span></div>
+          <div class="col-card-type">DATETIME · AUTO</div>
+          <div class="col-card-desc">วันที่สร้าง / วันที่แก้ไขล่าสุด (ON UPDATE)</div><span class="col-card-example">'2026-03-10 08:00:00'</span>
+        </div>
+      </div>
+      <div class="t-wrap" style="overflow-x:auto;margin-top:4px">
+        <table>
+          <thead><tr><th>id</th><th>account_id</th><th>shop_ref_id</th><th>document_url</th><th>status</th><th>admin_remark</th><th>created_at</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="m">1</td><td class="m" style="color:#2563eb">ACC001</td><td class="m" style="color:#0891b2">SHOP001</td>
+              <td class="url">…/id_card_somchai.jpg</td>
+              <td><span class="b yellow">pending</span></td>
+              <td style="font-size:12px;max-width:200px;white-space:normal">รูปบัตรฯ เบลอ รบกวนถ่ายใหม่ครับ</td>
+              <td class="m" style="font-size:11px">2026-03-10 08:00</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- report_requests -->
+    <div class="t-section">
+      <div class="section-divider">report_requests — คำร้องร้องเรียน/แจ้งโกง</div>
+      <div class="schema-grid">
+        <div class="col-card" style="border-left-color:#f59e0b">
+          <div class="col-card-top"><span class="col-card-name">id</span><span class="col-card-pk">PK</span></div>
+          <div class="col-card-type">INT AUTO_INCREMENT</div>
+          <div class="col-card-desc">รหัสคำร้อง</div><span class="col-card-example">1</span>
+        </div>
+        <div class="col-card" style="border-left-color:#2563eb">
+          <div class="col-card-top"><span class="col-card-name">reporter_account_id</span><span class="col-card-fk">FK</span><span class="col-card-nn">NOT NULL</span></div>
+          <div class="col-card-type">VARCHAR(24) → accounts.id</div>
+          <div class="col-card-desc">ผู้ยื่นร้องเรียน</div><span class="col-card-example">'ACC003'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#0891b2">
+          <div class="col-card-top"><span class="col-card-name">reported_shop_ref_id</span><span class="col-card-fk">FK</span><span class="col-card-nn">NOT NULL</span></div>
+          <div class="col-card-type">VARCHAR(50) → shops.ref_id</div>
+          <div class="col-card-desc">ร้านที่ถูกร้องเรียน</div><span class="col-card-example">'SHOP003'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#dc2626">
+          <div class="col-card-top"><span class="col-card-name">reason</span><span class="col-card-nn">NOT NULL</span></div>
+          <div class="col-card-type">TEXT</div>
+          <div class="col-card-desc">รายละเอียดการร้องเรียน</div><span class="col-card-example">'โอนเงินแล้วบล็อกหนี'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#64748b">
+          <div class="col-card-top"><span class="col-card-name">evidence_url</span></div>
+          <div class="col-card-type">TEXT · NULL</div>
+          <div class="col-card-desc">URL หลักฐานที่แนบมาโดยตรง (นอกจาก attachments)</div><span class="col-card-example">'https://storage.../slip.jpg'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#dc2626">
+          <div class="col-card-top"><span class="col-card-name">damage_amount</span></div>
+          <div class="col-card-type">DECIMAL(10,2) · NULL</div>
+          <div class="col-card-desc">มูลค่าความเสียหายเป็นบาท ทศนิยม 2 ตำแหน่ง</div><span class="col-card-example">1500.00</span>
+        </div>
+        <div class="col-card" style="border-left-color:#d97706">
+          <div class="col-card-top"><span class="col-card-name">status</span></div>
+          <div class="col-card-type">VARCHAR(20) · DEFAULT 'pending'</div>
+          <div class="col-card-desc">pending / approved / rejected</div><span class="col-card-example">'approved'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#64748b">
+          <div class="col-card-top"><span class="col-card-name">created_at / updated_at</span></div>
+          <div class="col-card-type">DATETIME · AUTO</div>
+          <div class="col-card-desc">วันที่สร้าง / แก้ไขล่าสุด</div><span class="col-card-example">'2026-03-15 14:00:00'</span>
+        </div>
+      </div>
+      <div class="t-wrap" style="overflow-x:auto;margin-top:4px">
+        <table>
+          <thead><tr><th>id</th><th>reporter_account_id</th><th>reported_shop_ref_id</th><th>reason</th><th>evidence_url</th><th>damage_amount</th><th>status</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="m">1</td><td class="m" style="color:#2563eb">ACC003</td><td class="m" style="color:#dc2626">SHOP003</td>
+              <td style="max-width:180px;white-space:normal;font-size:12px;line-height:1.4">โอนเงินแล้วบล็อกหนี ติดต่อไม่ได้เลย</td>
+              <td class="url">…/slip_transfer.jpg</td>
+              <td style="font-family:var(--mono);color:#dc2626;font-weight:600">฿ 1,500.00</td>
+              <td><span class="b green">approved</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- claim_requests -->
+    <div class="t-section">
+      <div class="section-divider">claim_requests — คำขอเคลมความเป็นเจ้าของร้าน</div>
+      <div class="schema-grid">
+        <div class="col-card" style="border-left-color:#f59e0b">
+          <div class="col-card-top"><span class="col-card-name">id</span><span class="col-card-pk">PK</span></div>
+          <div class="col-card-type">INT AUTO_INCREMENT</div>
+          <div class="col-card-desc">รหัสคำขอ claim</div><span class="col-card-example">1</span>
+        </div>
+        <div class="col-card" style="border-left-color:#2563eb">
+          <div class="col-card-top"><span class="col-card-name">claimer_account_id</span><span class="col-card-fk">FK</span><span class="col-card-nn">NOT NULL</span></div>
+          <div class="col-card-type">VARCHAR(24) → accounts.id</div>
+          <div class="col-card-desc">ผู้ขอเคลมว่าตัวเองเป็นเจ้าของร้าน</div><span class="col-card-example">'ACC001'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#0891b2">
+          <div class="col-card-top"><span class="col-card-name">shop_ref_id</span><span class="col-card-fk">FK</span><span class="col-card-nn">NOT NULL</span></div>
+          <div class="col-card-type">VARCHAR(50) → shops.ref_id</div>
+          <div class="col-card-desc">ร้านที่ต้องการเคลม</div><span class="col-card-example">'SHOP003'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#0891b2">
+          <div class="col-card-top"><span class="col-card-name">evidence_url</span><span class="col-card-nn">NOT NULL</span></div>
+          <div class="col-card-type">TEXT</div>
+          <div class="col-card-desc">URL หลักฐานยืนยันความเป็นเจ้าของ</div><span class="col-card-example">'https://storage.../claim_evidence.jpg'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#64748b">
+          <div class="col-card-top"><span class="col-card-name">contact_info</span></div>
+          <div class="col-card-type">VARCHAR(255) · NULL</div>
+          <div class="col-card-desc">ข้อมูลติดต่อเพิ่มเติม เบอร์โทร / Line ID</div><span class="col-card-example">'Line: @somchai'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#d97706">
+          <div class="col-card-top"><span class="col-card-name">status</span></div>
+          <div class="col-card-type">VARCHAR(20) · DEFAULT 'pending'</div>
+          <div class="col-card-desc">pending / approved / rejected</div><span class="col-card-example">'pending'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#64748b">
+          <div class="col-card-top"><span class="col-card-name">created_at / updated_at</span></div>
+          <div class="col-card-type">DATETIME · AUTO</div>
+          <div class="col-card-desc">วันที่สร้าง / แก้ไขล่าสุด</div><span class="col-card-example">'2026-03-16 10:00:00'</span>
+        </div>
+      </div>
+      <div class="t-wrap" style="overflow-x:auto;margin-top:4px">
+        <table>
+          <thead><tr><th>id</th><th>claimer_account_id</th><th>shop_ref_id</th><th>evidence_url</th><th>contact_info</th><th>status</th><th>created_at</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="m">1</td><td class="m" style="color:#2563eb">ACC001</td><td class="m" style="color:#0891b2">SHOP003</td>
+              <td class="url">…/claim_evidence.jpg</td>
+              <td class="null">NULL</td>
+              <td><span class="b yellow">pending</span></td>
+              <td class="m" style="font-size:11px">2026-03-16 10:00</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ ATTACHMENTS ════════════════════════════════ -->
+<div class="page" id="page-attachments">
+  <div class="page-hero">
+    <div class="page-hero-top">
+      <div class="hero-icon" style="background:#f0fdfa">📎</div>
+      <div class="hero-content">
+        <h1 style="color:#0f766e">attachments</h1>
+        <p>ไฟล์แนบทั้งหมด · แต่ละ row ผูกกับ request ประเภทเดียว FK อื่นเป็น NULL · ON DELETE CASCADE ทุก FK</p>
+      </div>
+    </div>
+    <div class="hero-pills"><span class="pill">6 columns</span><span class="pill">3 FK (nullable)</span><span class="pill">ON DELETE CASCADE</span></div>
+  </div>
+  <div class="page-body">
+    <div class="t-section">
+      <div class="section-divider">Column Definitions</div>
+      <div class="schema-grid">
+        <div class="col-card" style="border-left-color:#f59e0b">
+          <div class="col-card-top"><span class="col-card-name">id</span><span class="col-card-pk">PK</span></div>
+          <div class="col-card-type">INT AUTO_INCREMENT</div>
+          <div class="col-card-desc">รหัสไฟล์แนบ</div><span class="col-card-example">1, 2, 3</span>
+        </div>
+        <div class="col-card" style="border-left-color:#d97706">
+          <div class="col-card-top"><span class="col-card-name">upgrade_request_id</span><span class="col-card-fk">FK</span></div>
+          <div class="col-card-type">INT · NULL → upgrade_requests.id</div>
+          <div class="col-card-desc">ผูกกับ upgrade ถ้าเป็นไฟล์ขอ Verified · ถ้าไม่ใช่ = NULL</div><span class="col-card-example">1 หรือ NULL</span>
+        </div>
+        <div class="col-card" style="border-left-color:#dc2626">
+          <div class="col-card-top"><span class="col-card-name">report_request_id</span><span class="col-card-fk">FK</span></div>
+          <div class="col-card-type">INT · NULL → report_requests.id</div>
+          <div class="col-card-desc">ผูกกับ report ถ้าเป็นหลักฐานการโกง · ถ้าไม่ใช่ = NULL</div><span class="col-card-example">1 หรือ NULL</span>
+        </div>
+        <div class="col-card" style="border-left-color:#0891b2">
+          <div class="col-card-top"><span class="col-card-name">claim_request_id</span><span class="col-card-fk">FK</span></div>
+          <div class="col-card-type">INT · NULL → claim_requests.id</div>
+          <div class="col-card-desc">ผูกกับ claim ถ้าเป็นหลักฐานการ claim · ถ้าไม่ใช่ = NULL</div><span class="col-card-example">1 หรือ NULL</span>
+        </div>
+        <div class="col-card" style="border-left-color:#0f766e">
+          <div class="col-card-top"><span class="col-card-name">file_url</span><span class="col-card-nn">NOT NULL</span></div>
+          <div class="col-card-type">TEXT</div>
+          <div class="col-card-desc">URL ไฟล์ที่อัปโหลดไว้ใน storage</div><span class="col-card-example">'https://storage.../slip.jpg'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#64748b">
+          <div class="col-card-top"><span class="col-card-name">created_at</span></div>
+          <div class="col-card-type">DATETIME · DEFAULT CURRENT_TIMESTAMP</div>
+          <div class="col-card-desc">วันที่อัปโหลดไฟล์</div><span class="col-card-example">'2026-03-10 08:05:00'</span>
+        </div>
+      </div>
+    </div>
+    <div class="t-section">
+      <div class="section-divider">Mock Data (3 rows)</div>
+      <div class="t-wrap" style="overflow-x:auto">
+        <table>
+          <thead><tr><th>id</th><th>upgrade_request_id</th><th>report_request_id</th><th>claim_request_id</th><th>file_url</th><th>ประเภท</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="m">1</td>
+              <td class="m" style="color:#d97706">1</td>
+              <td class="null">NULL</td><td class="null">NULL</td>
+              <td class="url">…/id_card_somchai.jpg</td>
+              <td><span class="b orange">บัตรประชาชน</span></td>
+            </tr>
+            <tr>
+              <td class="m">2</td>
+              <td class="null">NULL</td>
+              <td class="m" style="color:#dc2626">1</td>
+              <td class="null">NULL</td>
+              <td class="url">…/slip_transfer.jpg</td>
+              <td><span class="b red">สลิปโอนเงิน</span></td>
+            </tr>
+            <tr>
+              <td class="m">3</td>
+              <td class="null">NULL</td>
+              <td class="m" style="color:#dc2626">1</td>
+              <td class="null">NULL</td>
+              <td class="url">…/chat_log.jpg</td>
+              <td><span class="b red">แชทหลักฐาน</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><span class="note-ic">📌</span><span>row 2 & 3 ผูกกับ <code>report_request_id = 1</code> ทั้งคู่ · 1 คำร้องมีหลายไฟล์แนบได้</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ LOGS & BLACKLIST ════════════════════════════ -->
+<div class="page" id="page-logs">
+  <div class="page-hero">
+    <div class="page-hero-top">
+      <div class="hero-icon" style="background:#fff1f2">🚨</div>
+      <div class="hero-content">
+        <h1 style="color:#be123c">logs &amp; blacklist</h1>
+        <p>upgrade_approval_logs บันทึกทุก action ของแอดมิน · blacklists ผูก ON DELETE SET NULL ถ้า report ถูกลบ</p>
+      </div>
+    </div>
+    <div class="hero-pills"><span class="pill">2 tables</span><span class="pill">FK → admins, shops, requests</span></div>
+  </div>
+  <div class="page-body">
+
+    <!-- upgrade_approval_logs -->
+    <div class="t-section">
+      <div class="section-divider">upgrade_approval_logs — ประวัติการพิจารณาคำขอเลื่อนขั้น</div>
+      <div class="schema-grid">
+        <div class="col-card" style="border-left-color:#f59e0b">
+          <div class="col-card-top"><span class="col-card-name">id</span><span class="col-card-pk">PK</span></div>
+          <div class="col-card-type">INT AUTO_INCREMENT</div>
+          <div class="col-card-desc">รหัส log</div><span class="col-card-example">1</span>
+        </div>
+        <div class="col-card" style="border-left-color:#d97706">
+          <div class="col-card-top"><span class="col-card-name">upgrade_request_id</span><span class="col-card-fk">FK</span><span class="col-card-nn">NOT NULL</span></div>
+          <div class="col-card-type">INT → upgrade_requests.id · CASCADE</div>
+          <div class="col-card-desc">คำขอที่ถูกพิจารณา</div><span class="col-card-example">1</span>
+        </div>
+        <div class="col-card" style="border-left-color:#7c3aed">
+          <div class="col-card-top"><span class="col-card-name">admin_id</span><span class="col-card-fk">FK</span><span class="col-card-nn">NOT NULL</span></div>
+          <div class="col-card-type">INT → admins.id</div>
+          <div class="col-card-desc">แอดมินที่เป็นคนพิจารณา</div><span class="col-card-example">2</span>
+        </div>
+        <div class="col-card" style="border-left-color:#dc2626">
+          <div class="col-card-top"><span class="col-card-name">action</span><span class="col-card-nn">NOT NULL</span></div>
+          <div class="col-card-type">ENUM('APPROVED','REJECTED')</div>
+          <div class="col-card-desc">ผลการพิจารณา</div><span class="col-card-example">'REJECTED'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#64748b">
+          <div class="col-card-top"><span class="col-card-name">reason</span></div>
+          <div class="col-card-type">TEXT · NULL</div>
+          <div class="col-card-desc">เหตุผลที่แนบมา โดยเฉพาะกรณี REJECTED</div><span class="col-card-example">'รูปบัตรเบลอมาก'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#64748b">
+          <div class="col-card-top"><span class="col-card-name">processed_at</span></div>
+          <div class="col-card-type">DATETIME · DEFAULT CURRENT_TIMESTAMP</div>
+          <div class="col-card-desc">วันเวลาที่แอดมินดำเนินการ</div><span class="col-card-example">'2026-03-12 11:00:00'</span>
+        </div>
+      </div>
+      <div class="t-wrap" style="margin-top:4px">
+        <table>
+          <thead><tr><th>id</th><th>upgrade_request_id</th><th>admin_id</th><th>action</th><th>reason</th><th>processed_at</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="m">1</td>
+              <td class="m" style="color:#d97706">1</td>
+              <td class="m" style="color:#7c3aed">2</td>
+              <td><span class="b red">REJECTED</span></td>
+              <td style="max-width:220px;white-space:normal;font-size:12px;line-height:1.4">รูปบัตรประชาชนเบลอมาก รบกวนถ่ายใหม่ในที่สว่างครับ</td>
+              <td class="m" style="font-size:11px">2026-03-12 11:00</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- blacklists -->
+    <div class="t-section">
+      <div class="section-divider">blacklists — รายการแบนร้านค้า</div>
+      <div class="schema-grid">
+        <div class="col-card" style="border-left-color:#f59e0b">
+          <div class="col-card-top"><span class="col-card-name">id</span><span class="col-card-pk">PK</span></div>
+          <div class="col-card-type">INT AUTO_INCREMENT</div>
+          <div class="col-card-desc">รหัส blacklist record</div><span class="col-card-example">1</span>
+        </div>
+        <div class="col-card" style="border-left-color:#0891b2">
+          <div class="col-card-top"><span class="col-card-name">shop_ref_id</span><span class="col-card-fk">FK</span><span class="col-card-nn">NOT NULL</span></div>
+          <div class="col-card-type">VARCHAR(50) → shops.ref_id · CASCADE</div>
+          <div class="col-card-desc">ร้านที่ถูกแบน</div><span class="col-card-example">'SHOP003'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#7c3aed">
+          <div class="col-card-top"><span class="col-card-name">admin_id</span><span class="col-card-fk">FK</span><span class="col-card-nn">NOT NULL</span></div>
+          <div class="col-card-type">INT → admins.id (ไม่มี CASCADE)</div>
+          <div class="col-card-desc">แอดมินที่สั่งแบน</div><span class="col-card-example">1</span>
+        </div>
+        <div class="col-card" style="border-left-color:#dc2626">
+          <div class="col-card-top"><span class="col-card-name">report_request_id</span><span class="col-card-fk">FK</span></div>
+          <div class="col-card-type">INT · NULL → report_requests.id · <strong>SET NULL</strong></div>
+          <div class="col-card-desc">คำร้องที่เป็นสาเหตุของการแบน · ถ้า report ถูกลบ → NULL</div><span class="col-card-example">1 หรือ NULL</span>
+        </div>
+        <div class="col-card" style="border-left-color:#dc2626">
+          <div class="col-card-top"><span class="col-card-name">reason</span><span class="col-card-nn">NOT NULL</span></div>
+          <div class="col-card-type">TEXT</div>
+          <div class="col-card-desc">เหตุผลที่แบนร้านค้านี้</div><span class="col-card-example">'ฉ้อโกงลูกค้า มีหลักฐานชัดเจน'</span>
+        </div>
+        <div class="col-card" style="border-left-color:#64748b">
+          <div class="col-card-top"><span class="col-card-name">is_active</span></div>
+          <div class="col-card-type">TINYINT(1) · DEFAULT 1</div>
+          <div class="col-card-desc">1 = แบนอยู่ · 0 = ยกเลิกแบนแล้ว (unban)</div><span class="col-card-example">1</span>
+        </div>
+        <div class="col-card" style="border-left-color:#64748b">
+          <div class="col-card-top"><span class="col-card-name">created_at / updated_at</span></div>
+          <div class="col-card-type">DATETIME · AUTO</div>
+          <div class="col-card-desc">วันที่แบน / วันที่อัปเดตสถานะการแบน</div><span class="col-card-example">'2026-03-18 09:00:00'</span>
+        </div>
+      </div>
+      <div class="t-wrap" style="margin-top:4px">
+        <table>
+          <thead><tr><th>id</th><th>shop_ref_id</th><th>admin_id</th><th>report_request_id</th><th>reason</th><th>is_active</th><th>created_at</th></tr></thead>
+          <tbody>
+            <tr style="background:#fff5f5">
+              <td class="m">1</td>
+              <td class="m" style="color:#dc2626">SHOP003</td>
+              <td class="m" style="color:#7c3aed">1</td>
+              <td class="m" style="color:#dc2626">1</td>
+              <td style="max-width:200px;white-space:normal;font-size:12px;line-height:1.4">ฉ้อโกงลูกค้า มีหลักฐานสลิปและแชทชัดเจน</td>
+              <td><span class="b red">1 · แบนอยู่</span></td>
+              <td class="m" style="font-size:11px">2026-03-18 09:00</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><span class="note-ic">🔑</span>
+        <span>blacklists.report_request_id ใช้ <strong>ON DELETE SET NULL</strong> ต่างจากตารางอื่น · ถ้าลบ report_requests ที่ id=1 ออก → field นี้จะกลายเป็น NULL แต่ blacklist ยังคงอยู่</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<footer>
+  <span class="ft">ossd14 · schema v1.0 · MySQL Workbench 2026-03-18</span>
+  <span class="ft">INSERT ลำดับ: accounts → admins → shops → requests → attachments → logs → blacklists</span>
+</footer>
+
+<script>
+  const brandDot = document.getElementById('brand-dot');
+  function switchPage(pageId, color) {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.page === pageId));
+    document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + pageId));
+    const c = color || document.querySelector(`.nav-tab[data-page="${pageId}"]`)?.dataset.color || '#64748b';
+    document.documentElement.style.setProperty('--active-color', c);
+    brandDot.style.background = c;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  document.querySelectorAll('.nav-tab').forEach(t => t.addEventListener('click', () => switchPage(t.dataset.page, t.dataset.color)));
+</script>
+</body>
+</html>
