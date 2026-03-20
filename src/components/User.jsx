@@ -88,16 +88,26 @@ const MOCK_SHOPS_ALL = [
 ];
 
 // Mock ข้อมูลร้านค้าของ MOCK_USER_WITH_SHOP (role = "shop")
+// upgrade_history: เก็บประวัติทุกครั้ง status: "rejected" | "approved" | "pending"
+// last_rejected_at: ISO date string ของครั้งล่าสุดที่ถูก rejected (null ถ้ายังไม่เคย)
+// failed_count: จำนวนครั้งที่ rejected สะสม (นับเฉพาะ rejected ที่ยังไม่หมดรอบ)
 const MOCK_MY_SHOP = {
   id: 10, name: "ร้านผัดไทยนายดี", category: "อาหาร", tier: 1, current_tier: 1,
-  entity_type: "individual",   // TODO: ดึงจาก API จริง
+  entity_type: "individual",
   link: "https://line.me/my-shop",
   description: "ผัดไทยกุ้งสด เส้นเหนียวหนึบ ไข่ห่อ เสิร์ฟพร้อมผักสด",
   rating: 4.5, orders_count: 143,
   is_closed: false, is_blacklisted: false, img_emoji: "🍝",
+  // ---- ทดสอบ: เปลี่ยน failed_count และ last_rejected_at เพื่อดูพฤติกรรมต่างๆ ----
+  // failed_count: 0 → ยื่นได้ปกติ
+  // failed_count: 1-2 → ยื่นได้ปกติ แต่เตือนจำนวนครั้งที่เหลือ
+  // failed_count: 3 + last_rejected_at ยังไม่ครบ 1 เดือน → ต้องรอ
+  // failed_count: 3 + last_rejected_at ครบ 1 เดือนแล้ว → reset เป็น 0 ยื่นได้ใหม่
+  failed_count: 2,
+  last_rejected_at: "2568-02-10",   // วันที่ reject ครั้งล่าสุด (YYYY-MM-DD พุทธศักราช หรือจะใช้ ISO ก็ได้)
   upgrade_history: [
-    { round: 1, tier_requested: 2, status: "rejected", reason: "เอกสารภาพไม่ชัดเจน", date: "15/01/2568" },
-    { round: 2, tier_requested: 2, status: "pending", date: "10/03/2568" },
+    { round: 1, tier_requested: 2, status: "rejected", reason: "เอกสารภาพไม่ชัดเจน",      date: "15/12/2567" },
+    { round: 2, tier_requested: 2, status: "rejected", reason: "เอกสารไม่ตรงประเภทที่กำหนด", date: "10/02/2568" },
   ],
   created_at: "01/09/2567",
 };
@@ -492,40 +502,28 @@ function Navbar({ user, onNavigate, darkMode, toggleDark, currentPage }) {
         </div>
 
         <div className="nav-right">
-          {/* ผู้เยี่ยมชม (visitor) — ยังไม่ login */}
-          {!user && (
-            <button className="btn btn-primary btn-sm" onClick={() => setShowLogin(true)}>
-              เข้าสู่ระบบ
+          {/* ถ้า login แล้ว แสดงชื่อและปุ่มโปรไฟล์ */}
+          {user && (
+            <button className="btn btn-ghost btn-sm" onClick={() => onNavigate("profile")}>
+              {user.role === "admin" ? "🔑" : user.role === "shop" ? "🏪" : "👤"} {user.name.split(" ")[0]}
             </button>
           )}
 
-          {/* ผู้ใช้ทั่วไป (user) — login แล้ว แต่ไม่มีร้าน */}
-          {user && user.role === "user" && (
-            <>
-              <button className="btn btn-ghost btn-sm" onClick={() => onNavigate("profile")}>
-                👤 {user.name.split(" ")[0]}
-              </button>
-              <button className="btn btn-outline btn-sm" onClick={handleLogout}>ออกจากระบบ</button>
-            </>
+          {/* ปุ่ม "ร้านของฉัน" — แสดงทุก role รวมถึง visitor
+              - visitor  → ไปหน้า login
+              - user     → ไปหน้าติดต่อ myOrder (UC16)
+              - shop     → ไปหน้ารายละเอียดร้านค้า (UC19)
+              - admin    → ซ่อน (admin ไม่มีร้านค้า) */}
+          {(!user || user.role !== "admin") && (
+            <button className="btn btn-outline btn-sm" onClick={() => onNavigate("myshop")}>
+              🏪 ร้านของฉัน
+            </button>
           )}
 
-          {/* ร้านค้า (shop) — login แล้ว มีร้านในครอบครอง */}
-          {user && user.role === "shop" && (
-            <>
-              <button className="btn btn-ghost btn-sm" onClick={() => onNavigate("profile")}>
-                👤 {user.name.split(" ")[0]}
-              </button>
-              {/* UC19: ดูรายละเอียดร้านค้าในครอบครอง */}
-              <button className="btn btn-outline btn-sm" onClick={() => onNavigate("myshop")}>
-                🏪 ร้านของฉัน
-              </button>
-            </>
-          )}
-
-          {/* แอดมิน (admin) */}
-          {user && user.role === "admin" && (
-            <button className="btn btn-danger btn-sm" onClick={() => onNavigate("profile")}>
-              🔑 แอดมิน
+          {/* ปุ่มเข้าสู่ระบบ — เฉพาะ visitor */}
+          {!user && (
+            <button className="btn btn-primary btn-sm" onClick={() => setShowLogin(true)}>
+              เข้าสู่ระบบ
             </button>
           )}
 
@@ -1116,33 +1114,50 @@ function ProfilePage({ user, onNavigate }) {
 }
 
 // ============================================================
-// PAGE: MY SHOP DASHBOARD
-// UC19: ดูรายละเอียดร้านค้าในครอบครอง — เฉพาะ role="shop"
-// UC1:  แก้ไขรายละเอียดร้านค้า — เฉพาะ role="shop" หรือ "admin"
-// UC20: ยื่นขอเลื่อนขั้น — เฉพาะ role="shop"
+// PAGE: MY SHOP
+// UC16: role="user" (ไม่มีร้าน) → แสดงหน้าติดต่อ myOrder
+// UC19: role="shop" (มีร้าน)    → แสดงรายละเอียดร้านค้า + แก้ไข + ขอเลื่อนขั้น
 // ============================================================
 function MyShopPage({ user, onNavigate, notify }) {
-  // guard: ถ้าไม่ใช่ role="shop" ให้ redirect
-  if (!user || (user.role !== "shop" && user.role !== "admin")) {
+  // กรณี role="user" — ไม่มีร้านค้า แสดงหน้าติดต่อ myOrder (UC16)
+  if (user && user.role === "user") {
     return (
       <div className="page">
-        <div className="section" style={{ paddingTop: 40, textAlign: "center" }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>🔒</div>
-          <h2 style={{ fontFamily: "var(--display)", fontSize: 20, marginBottom: 12 }}>ไม่มีสิทธิ์เข้าถึงหน้านี้</h2>
-          <p style={{ color: "var(--text2)", fontSize: 14, marginBottom: 20 }}>หน้านี้สำหรับเจ้าของร้านค้าเท่านั้น</p>
-          <button className="btn btn-primary" onClick={() => onNavigate("home")}>กลับหน้าหลัก</button>
+        <div className="section" style={{ paddingTop: 28, maxWidth: 640 }}>
+          <button className="btn btn-ghost btn-sm" style={{ marginBottom: 20 }} onClick={() => onNavigate("home")}>← กลับ</button>
+          <div className="dash-card" style={{ textAlign: "center", padding: 40 }}>
+            <div style={{ fontSize: 56, marginBottom: 16 }}>🏪</div>
+            <h2 style={{ fontFamily: "var(--display)", fontSize: 20, fontWeight: 600, marginBottom: 8 }}>
+              คุณยังไม่มีร้านค้าในระบบ
+            </h2>
+            <p style={{ color: "var(--text2)", fontSize: 14, marginBottom: 8, lineHeight: 1.7 }}>
+              หากต้องการลงทะเบียนร้านค้ากับทาง myOrder<br />กรุณาติดต่อทีมงานเพื่อดำเนินการ
+            </p>
+            <p style={{ color: "var(--text3)", fontSize: 13, marginBottom: 28 }}>
+              หลังลงทะเบียนแล้ว ร้านค้าจะปรากฎในระบบ และสามารถขอเลื่อนขั้นได้
+            </p>
+            {/* UC16: ปุ่มติดต่อ myOrder */}
+            <a href="https://line.me/myorder-register" className="btn btn-primary btn-lg" target="_blank" rel="noreferrer">
+              📩 ติดต่อ myOrder เพื่อลงทะเบียนร้านค้า
+            </a>
+          </div>
         </div>
       </div>
     );
   }
 
+  // กรณีอื่นที่ไม่ใช่ shop/admin — ไม่ควรเกิดขึ้น (navigate() กัน visitor ไว้แล้ว)
+  if (!user || (user.role !== "shop" && user.role !== "admin")) {
+    return null;
+  }
+
+  // UC19: role="shop" — แสดงรายละเอียดร้านค้าในครอบครอง
   const [shop, setShop] = useState(MOCK_MY_SHOP);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({ name: shop.name, link: shop.link, description: shop.description });
 
   // UC1: แก้ไขรายละเอียดร้านค้า
   const handleSave = () => {
-    // TODO: await api.updateMyShop(editForm)
     setShop(p => ({ ...p, ...editForm }));
     setEditing(false);
     notify("บันทึกข้อมูลเรียบร้อย", "success");
@@ -1160,7 +1175,7 @@ function MyShopPage({ user, onNavigate, notify }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <div>
             <h2 style={{ fontFamily: "var(--display)", fontSize: 22, fontWeight: 600 }}>รายละเอียดร้านค้าของฉัน</h2>
-            <p style={{ color: "var(--text3)", fontSize: 13 }}>UC19: ดูและจัดการร้านค้าในครอบครอง</p>
+            <p style={{ color: "var(--text3)", fontSize: 13 }}>จัดการข้อมูลและสถานะร้านค้า</p>
           </div>
           <button className="btn btn-ghost btn-sm" onClick={() => onNavigate("profile")}>← กลับโปรไฟล์</button>
         </div>
@@ -1179,31 +1194,93 @@ function MyShopPage({ user, onNavigate, notify }) {
               <span style={{ fontSize: 40 }}>{shop.img_emoji}</span>
               <div>
                 <div style={{ fontFamily: "var(--display)", fontSize: 18, fontWeight: 600 }}>{shop.name}</div>
-                <div style={{ display: "flex", gap: 6, marginTop: 4 }}><TierBadge tier={shop.tier} /><span className="badge badge-gray">{shop.category}</span></div>
+                <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                  <TierBadge tier={shop.tier} />
+                  <span className="badge badge-gray">{shop.category}</span>
+                </div>
               </div>
             </div>
-            {/* UC1: ปุ่มแก้ไขรายละเอียดร้านค้า */}
-            <button className="btn btn-outline btn-sm" onClick={() => setEditing(true)}>✏️ แก้ไขข้อมูล (UC1)</button>
+            {/* UC1: ปุ่มแก้ไขรายละเอียด */}
+            <button className="btn btn-outline btn-sm" onClick={() => setEditing(true)}>✏️ แก้ไขข้อมูล</button>
           </div>
           <div className="detail-row"><div className="detail-label">🔗 ลิงก์</div><div className="detail-value"><a href={shop.link} style={{ color: "var(--accent)" }} target="_blank" rel="noreferrer">{shop.link}</a></div></div>
           <div className="detail-row"><div className="detail-label">📝 รายละเอียด</div><div className="detail-value" style={{ color: "var(--text2)" }}>{shop.description}</div></div>
           <div className="detail-row"><div className="detail-label">📅 สร้างเมื่อ</div><div className="detail-value" style={{ color: "var(--text3)" }}>{shop.created_at}</div></div>
-          <div className="detail-row">
-            <div className="detail-label">👤 ประเภท</div>
-            <div className="detail-value">{shop.entity_type === "company" ? "🏢 นิติบุคคล" : "👤 บุคคลธรรมดา"}</div>
-          </div>
+          <div className="detail-row"><div className="detail-label">👤 ประเภท</div><div className="detail-value">{shop.entity_type === "company" ? "🏢 นิติบุคคล" : "👤 บุคคลธรรมดา"}</div></div>
         </div>
 
-        {/* UC20: ขอเลื่อนขั้น */}
-        {shop.tier < 3 && (
-          <div className="dash-card" style={{ marginBottom: 16, background: "linear-gradient(135deg, #fff7f5, #fef3ee)", border: "1.5px solid rgba(232,93,38,0.2)" }}>
-            <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-              <div style={{ fontSize: 36 }}>🚀</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontFamily: "var(--display)", fontSize: 16, fontWeight: 600, marginBottom: 4 }}>เลื่อนขั้นเพื่อความน่าเชื่อถือ (UC20)</div>
-                <p style={{ fontSize: 13, color: "var(--text2)" }}>ขั้น {shop.tier + 1} จะทำให้ลูกค้าเชื่อมั่นในร้านคุณมากขึ้น</p>
+        {/* UC20: ส่วนขอเลื่อนขั้น */}
+        {shop.tier === 1 && (() => {
+          // คำนวณ cooldown เพื่อแสดงสถานะในหน้า MyShop ด้วย
+          const { failed_count, last_rejected_at } = shop;
+          let inCooldown = false;
+          let daysLeft = 0;
+          if (failed_count >= 3 && last_rejected_at) {
+            const [y, m, d] = last_rejected_at.split("-").map(Number);
+            const year = y > 2500 ? y - 543 : y;
+            const diff = Math.floor((new Date() - new Date(year, m - 1, d)) / 86400000);
+            daysLeft = 30 - diff;
+            inCooldown = daysLeft > 0;
+          }
+          return (
+            <div className="dash-card" style={{ marginBottom: 16, background: inCooldown ? "linear-gradient(135deg,#fef9f9,#fef2f2)" : "linear-gradient(135deg,#fff7f5,#fef3ee)", border: `1.5px solid ${inCooldown ? "rgba(220,38,38,0.2)" : "rgba(232,93,38,0.2)"}` }}>
+              <div style={{ display: "flex", gap: 16, alignItems: inCooldown ? "flex-start" : "center" }}>
+                <div style={{ fontSize: 36 }}>{inCooldown ? "⏳" : "🚀"}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontFamily: "var(--display)", fontSize: 16, fontWeight: 600, marginBottom: 4 }}>
+                    ขอเลื่อนขั้น 1 → 2
+                  </div>
+                  {inCooldown ? (
+                    <div className="alert alert-error" style={{ marginTop: 4 }}>
+                      <div style={{ fontSize: 13, lineHeight: 1.7 }}>
+                        ขอเลื่อนขั้นไม่ผ่านครบ 3 ครั้งแล้ว ต้องรออีก <strong>{daysLeft} วัน</strong> ก่อนยื่นใหม่
+                      </div>
+                    </div>
+                  ) : (
+                    <p style={{ fontSize: 13, color: "var(--text2)" }}>
+                      ยืนยันตัวตนด้วยเอกสาร เพื่อเพิ่มความน่าเชื่อถือ
+                      {failed_count > 0 && (
+                        <span style={{ marginLeft: 6, color: "var(--yellow)", fontWeight: 700 }}>
+                          (ไม่ผ่าน {failed_count}/3 ครั้ง)
+                        </span>
+                      )}
+                    </p>
+                  )}
+                </div>
+                {!inCooldown && (
+                  <button className="btn btn-primary" onClick={() => onNavigate("upgrade")}>ยื่นขอเลื่อนขั้น →</button>
+                )}
               </div>
-              <button className="btn btn-primary" onClick={() => onNavigate("upgrade")}>ยื่นขอเลื่อนขั้น →</button>
+            </div>
+          );
+        })()}
+
+        {shop.tier === 2 && (
+          // ขั้น 2→3: ต้องให้แอดมินจัดการ ร้านค้าทำเองไม่ได้
+          <div className="dash-card" style={{ marginBottom: 16, background: "linear-gradient(135deg, #fffbeb, #fef9c3)", border: "1.5px solid rgba(217,119,6,0.25)" }}>
+            <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+              <div style={{ fontSize: 36 }}>🥇</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: "var(--display)", fontSize: 16, fontWeight: 600, marginBottom: 6 }}>
+                  การเลื่อนขั้น 2 → 3
+                </div>
+                <div className="alert alert-warn" style={{ marginBottom: 0 }}>
+                  ⚠️ ขั้นที่ 3 เป็นสิทธิ์ที่ต้องจัดการโดยแอดมินเท่านั้น<br />
+                  <span style={{ fontSize: 13 }}>ทีมงาน myOrder จะทดลองสั่งของจากร้านคุณก่อน หากผ่านการตรวจสอบแล้ว แอดมินจะเลื่อนขั้นให้อัตโนมัติ</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {shop.tier === 3 && (
+          <div className="dash-card" style={{ marginBottom: 16, background: "linear-gradient(135deg, #f0fdf4, #dcfce7)", border: "1.5px solid rgba(26,158,94,0.25)" }}>
+            <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+              <div style={{ fontSize: 36 }}>🏆</div>
+              <div>
+                <div style={{ fontFamily: "var(--display)", fontSize: 16, fontWeight: 600, marginBottom: 4 }}>ร้านค้าของคุณอยู่ระดับสูงสุดแล้ว!</div>
+                <p style={{ fontSize: 13, color: "var(--text2)" }}>ขอบคุณที่ไว้วางใจ myOrder ลูกค้าจะเห็น Badge ระดับ 3 ของคุณ</p>
+              </div>
             </div>
           </div>
         )}
@@ -1227,9 +1304,9 @@ function MyShopPage({ user, onNavigate, notify }) {
         </div>
       </div>
 
-      {/* UC1: Modal แก้ไขรายละเอียดร้านค้า */}
+      {/* UC1: Modal แก้ไขรายละเอียด */}
       {editing && (
-        <Modal title="✏️ แก้ไขรายละเอียดร้านค้า (UC1)" onClose={() => setEditing(false)}
+        <Modal title="✏️ แก้ไขรายละเอียดร้านค้า" onClose={() => setEditing(false)}
           footer={<>
             <button className="btn btn-ghost btn-sm" onClick={() => setEditing(false)}>ยกเลิก</button>
             <button className="btn btn-primary btn-sm" onClick={handleSave}>บันทึก</button>
@@ -1255,12 +1332,21 @@ function MyShopPage({ user, onNavigate, notify }) {
 
 // ============================================================
 // PAGE: UPGRADE WIZARD
-// UC20: ยื่นขอเลื่อนขั้น — เฉพาะ role="shop"
+// UC20: ยื่นขอเลื่อนขั้น 1→2 — เฉพาะ role="shop" และ tier=1
+//       ขั้น 2→3: ต้องให้แอดมินจัดการ ร้านค้าทำเองไม่ได้
 // UC17: ยื่นเอกสาร — include ใน flow นี้
 // ============================================================
 const WIZARD_STEPS = ["ตรวจสอบ", "อัปโหลด", "ยืนยัน"];
 
 function UpgradePage({ user, onNavigate, notify }) {
+  const currentTier = MOCK_MY_SHOP.current_tier;
+  const entityType  = MOCK_MY_SHOP.entity_type;
+  const [step, setStep]           = useState(0);
+  const [checks, setChecks]       = useState({ eligible: null, failed_count: 0, days_remaining: 0 });
+  const [files, setFiles]         = useState({});
+  const [submitted, setSubmitted] = useState(false);
+  const fileRefs = useRef({});
+
   // guard: เฉพาะ role="shop"
   if (!user || user.role !== "shop") {
     return (
@@ -1275,61 +1361,104 @@ function UpgradePage({ user, onNavigate, notify }) {
     );
   }
 
-  const currentTier = MOCK_MY_SHOP.current_tier;
-  const autoTargetTier = currentTier === 1 ? 2 : currentTier === 2 ? 3 : null;
-  const [step, setStep] = useState(0);
-  const [targetTier] = useState(autoTargetTier);
-  const [checks, setChecks] = useState({ fraud_check: null, order_check: null });
-  const [files, setFiles] = useState({});
-  const [submitted, setSubmitted] = useState(false);
-  const fileRefs = useRef({});
-  const entityType = MOCK_MY_SHOP.entity_type;
+  // ขั้น 2→3: ต้องให้แอดมินจัดการ ร้านค้าทำเองไม่ได้
+  if (currentTier === 2) {
+    return (
+      <div className="page">
+        <div className="section" style={{ paddingTop: 28, maxWidth: 640 }}>
+          <button className="btn btn-ghost btn-sm" style={{ marginBottom: 20 }} onClick={() => onNavigate("myshop")}>← กลับ</button>
+          <div className="dash-card" style={{ textAlign: "center", padding: 40 }}>
+            <div style={{ fontSize: 56, marginBottom: 16 }}>🥇</div>
+            <h2 style={{ fontFamily: "var(--display)", fontSize: 20, fontWeight: 600, marginBottom: 12 }}>
+              การเลื่อนขั้น 2 → 3
+            </h2>
+            <div className="alert alert-warn" style={{ textAlign: "left", marginBottom: 24 }}>
+              <div>
+                ⚠️ <strong>ขั้นที่ 3 ต้องจัดการโดยแอดมินเท่านั้น</strong>
+                <div style={{ fontSize: 13, marginTop: 6, lineHeight: 1.7 }}>
+                  ทีมงาน myOrder จะทดลองสั่งของจากร้านคุณก่อน
+                  หากผ่านการตรวจสอบแล้ว แอดมินจะดำเนินการเลื่อนขั้นให้
+                  โปรดรอการติดต่อจากทีมงาน
+                </div>
+              </div>
+            </div>
+            <button className="btn btn-outline" onClick={() => onNavigate("myshop")}>กลับหน้าร้านค้า</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
+  // ขั้น 3 ขึ้นไป: สูงสุดแล้ว
+  if (currentTier >= 3) {
+    return (
+      <div className="page">
+        <div className="section" style={{ paddingTop: 28, maxWidth: 640, textAlign: "center" }}>
+          <h2 style={{ fontFamily: "var(--display)", fontSize: 22, fontWeight: 600, marginBottom: 16 }}>
+            ร้านค้าของคุณอยู่ระดับสูงสุดแล้ว 🏆
+          </h2>
+          <button className="btn btn-primary" onClick={() => onNavigate("myshop")}>กลับหน้าร้านค้า</button>
+        </div>
+      </div>
+    );
+  }
+
+  // ตรวจสอบสิทธิ์ขอเลื่อนขั้น (UC20):
+  // - failed_count < 3  → ยื่นได้ (เตือนจำนวนครั้งที่ใช้ไปแล้ว)
+  // - failed_count >= 3 → ต้องรอ 30 วันนับจาก last_rejected_at
+  // - ครบ 30 วันแล้ว   → reset (eligible = true, failed_count = 0)
   const runChecks = () => {
-    // TODO: await api.checkUpgradeEligibility(targetTier)
     setTimeout(() => {
-      setChecks({ fraud_check: true, order_check: targetTier === 3 ? true : null });
-    }, 800);
-  };
+      const { failed_count, last_rejected_at } = MOCK_MY_SHOP;
 
+      if (failed_count < 3) {
+        setChecks({ eligible: true, failed_count, days_remaining: 0 });
+        return;
+      }
+
+      // failed_count >= 3 → คำนวณวันที่เหลือต้องรอ
+      const parseDate = (str) => {
+        // รองรับ YYYY-MM-DD ทั้ง พ.ศ. (>2500) และ ค.ศ.
+        const [y, m, d] = str.split("-").map(Number);
+        const year = y > 2500 ? y - 543 : y;
+        return new Date(year, m - 1, d);
+      };
+
+      const lastReject = parseDate(last_rejected_at);
+      const diffDays   = Math.floor((new Date() - lastReject) / 86400000);
+      const daysLeft   = 30 - diffDays;
+
+      if (daysLeft > 0) {
+        // ยังต้องรออยู่
+        setChecks({ eligible: false, failed_count, days_remaining: daysLeft });
+      } else {
+        // ครบ 30 วันแล้ว → reset (TODO: เรียก API reset failed_count)
+        setChecks({ eligible: true, failed_count: 0, days_remaining: 0, was_reset: true });
+      }
+    }, 700);
+  };
   useEffect(() => { if (step === 0) runChecks(); }, [step]);
 
+  // UC17: เอกสารที่ต้องยื่น ขึ้นกับประเภทนิติบุคคล
   const getRequiredDocs = () => {
-    // UC17: เอกสารตามขั้นและประเภทนิติบุคคล
-    if (targetTier === 2 && entityType === "individual") return [
-      { key: "id_card",     label: "สำเนาบัตรประชาชน",           hint: "ถ่ายภาพให้ชัด ครบ 4 มุม" },
-      { key: "selfie_id",   label: "รูปถ่ายคู่บัตรประชาชน",      hint: "ถือบัตร ถ่ายให้เห็นหน้าและบัตรชัดเจน" },
+    if (entityType === "individual") return [
+      { key: "id_card",   label: "สำเนาบัตรประชาชน",        hint: "ถ่ายภาพให้ชัด ครบ 4 มุม" },
+      { key: "selfie_id", label: "รูปถ่ายคู่บัตรประชาชน",   hint: "ถือบัตร ถ่ายให้เห็นหน้าและบัตรชัดเจน" },
     ];
-    if (targetTier === 2 && entityType === "company") return [
-      { key: "vat",         label: "ภพ.20 (ทะเบียนภาษีมูลค่าเพิ่ม)",     hint: "เอกสารจากกรมสรรพากร" },
-      { key: "director_id", label: "บัตรประชาชนของกรรมการ",               hint: "สำเนาพร้อมเซ็นรับรอง" },
-      { key: "selfie_dir",  label: "รูปถ่ายกรรมการคู่บัตรประชาชน",        hint: "กรรมการถือบัตร ถ่ายให้ชัด" },
+    return [
+      { key: "vat",        label: "ภพ.20 (ทะเบียนภาษีมูลค่าเพิ่ม)",   hint: "เอกสารจากกรมสรรพากร" },
+      { key: "dir_id",     label: "บัตรประชาชนของกรรมการ",             hint: "สำเนาพร้อมเซ็นรับรอง" },
+      { key: "selfie_dir", label: "รูปถ่ายกรรมการคู่บัตรประชาชน",      hint: "กรรมการถือบัตร ถ่ายให้ชัด" },
     ];
-    if (targetTier === 3) return [
-      { key: "selfie_id",   label: "รูปถ่ายคู่บัตรประชาชน (ปัจจุบัน)",   hint: "ถือบัตร ถ่ายให้เห็นหน้าและบัตรชัดเจน" },
-    ];
-    return [];
   };
 
   const handleFileChange = (key, file) => setFiles(p => ({ ...p, [key]: file }));
   const allFilesUploaded = getRequiredDocs().every(d => files[d.key]);
 
   const handleSubmit = () => {
-    // TODO: submit to api.submitUpgrade()
     setSubmitted(true);
     notify("ส่งคำขอเรียบร้อยแล้ว รอแอดมินตรวจสอบ", "success");
   };
-
-  if (!targetTier) {
-    return (
-      <div className="page">
-        <div className="section" style={{ paddingTop: 28, maxWidth: 680, textAlign: "center" }}>
-          <h2 style={{ fontFamily: "var(--display)", fontSize: 22, fontWeight: 600, marginBottom: 16 }}>ร้านค้าของคุณอยู่ระดับสูงสุดแล้ว</h2>
-          <button className="btn btn-primary" onClick={() => onNavigate("myshop")}>กลับหน้าร้านค้า</button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="page">
@@ -1341,14 +1470,16 @@ function UpgradePage({ user, onNavigate, notify }) {
             <div style={{ fontSize: 56, marginBottom: 16 }}>✅</div>
             <h2 style={{ fontFamily: "var(--display)", fontSize: 22, fontWeight: 600, marginBottom: 8 }}>ส่งคำขอเรียบร้อยแล้ว!</h2>
             <p style={{ color: "var(--text2)", fontSize: 14, marginBottom: 24 }}>ทีมแอดมินจะตรวจสอบและแจ้งผลภายใน 1–3 วันทำการ</p>
-            <button className="btn btn-primary" onClick={() => onNavigate("myshop")}>กลับหน้าแดชบอร์ด</button>
+            <button className="btn btn-primary" onClick={() => onNavigate("myshop")}>กลับหน้าร้านค้า</button>
           </div>
         ) : (
           <>
             <h2 style={{ fontFamily: "var(--display)", fontSize: 22, fontWeight: 600, marginBottom: 6 }}>
-              UC20: ยื่นขอเลื่อนขั้นเป็น ขั้น {targetTier}
+              ยื่นขอเลื่อนขั้น 1 → 2
             </h2>
-            <p style={{ color: "var(--text2)", fontSize: 14, marginBottom: 28 }}>ระดับปัจจุบัน: <TierBadge tier={currentTier} /></p>
+            <p style={{ color: "var(--text2)", fontSize: 14, marginBottom: 28 }}>
+              ประเภท: {entityType === "individual" ? "👤 บุคคลธรรมดา" : "🏢 นิติบุคคล"} · ระดับปัจจุบัน: <TierBadge tier={currentTier} />
+            </p>
 
             <div className="wizard-steps">
               {WIZARD_STEPS.map((s, i) => (
@@ -1363,33 +1494,81 @@ function UpgradePage({ user, onNavigate, notify }) {
             {step === 0 && (
               <div className="dash-card">
                 <div className="dash-card-title">ตรวจสอบคุณสมบัติ</div>
-                <div className="dash-card-sub">ระบบตรวจสอบเงื่อนไขก่อนดำเนินการ</div>
+                <div className="dash-card-sub">ระบบกำลังตรวจสอบสิทธิ์ก่อนดำเนินการ</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
-                  {/* เงื่อนไข: ไม่มีประวัติโกงย้อนหลัง 3 เดือน */}
-                  <div className={`alert ${checks.fraud_check === null ? "alert-info" : checks.fraud_check ? "alert-success" : "alert-error"}`}>
-                    {checks.fraud_check === null ? "⏳ กำลังตรวจสอบประวัติการโกง..." : checks.fraud_check ? "✓ ไม่มีประวัติการโกงย้อนหลัง 3 เดือน" : "✕ พบประวัติการโกง ไม่สามารถขอเลื่อนขั้นได้"}
-                  </div>
-                  {/* เงื่อนไขพิเศษ ขั้น 3: ต้องมีประวัติสั่งของจาก myOrder */}
-                  {targetTier === 3 && (
-                    <div className={`alert ${checks.order_check === null ? "alert-info" : checks.order_check ? "alert-success" : "alert-error"}`}>
-                      {checks.order_check === null ? "⏳ กำลังตรวจสอบประวัติสั่งของ..." : checks.order_check ? "✓ มีประวัติการทดลองสั่งสินค้าจาก myOrder" : "✕ ไม่มีประวัติการสั่งของ กรุณาติดต่อแอดมิน"}
+
+                  {/* กำลังโหลด */}
+                  {checks.eligible === null && (
+                    <div className="alert alert-info">⏳ กำลังตรวจสอบจำนวนครั้งที่ขอเลื่อนขั้น...</div>
+                  )}
+
+                  {/* ครบ 3 ครั้ง ยังรออยู่ */}
+                  {checks.eligible === false && (
+                    <div className="alert alert-error">
+                      <div>
+                        <div style={{ fontWeight: 700, marginBottom: 6 }}>
+                          ✕ ขอเลื่อนขั้นไม่ผ่านครบ 3 ครั้งแล้ว
+                        </div>
+                        <div style={{ fontSize: 13, lineHeight: 1.7 }}>
+                          คุณได้ขอเลื่อนขั้นไม่ผ่านมาแล้ว <strong>{checks.failed_count} ครั้ง</strong> ในรอบนี้<br />
+                          ต้องรออีก <strong>{checks.days_remaining} วัน</strong> นับจากครั้งล่าสุดที่ไม่ผ่าน<br />
+                          <span style={{ opacity: 0.8 }}>จะสามารถยื่นขอใหม่ได้อีกครั้งหลังจากนั้น</span>
+                        </div>
+                      </div>
                     </div>
                   )}
+
+                  {/* ผ่าน — แต่เคย reject มาบ้างแล้ว แจ้งเตือน */}
+                  {checks.eligible === true && checks.failed_count > 0 && !checks.was_reset && (
+                    <>
+                      <div className="alert alert-success">
+                        ✓ สามารถยื่นขอเลื่อนขั้นได้
+                      </div>
+                      <div className="alert alert-warn">
+                        <div style={{ fontSize: 13, lineHeight: 1.7 }}>
+                          ⚠️ คุณขอเลื่อนขั้นไม่ผ่านมาแล้ว <strong>{checks.failed_count} / 3 ครั้ง</strong><br />
+                          หากไม่ผ่านอีก <strong>{3 - checks.failed_count} ครั้ง</strong> จะต้องรอ 30 วันก่อนยื่นใหม่
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {/* ผ่าน — ไม่เคย reject เลย */}
+                  {checks.eligible === true && checks.failed_count === 0 && !checks.was_reset && (
+                    <div className="alert alert-success">
+                      ✓ สามารถยื่นขอเลื่อนขั้นได้
+                    </div>
+                  )}
+
+                  {/* ผ่าน — เพิ่งครบ cooldown 30 วัน (was_reset) */}
+                  {checks.eligible === true && checks.was_reset && (
+                    <>
+                      <div className="alert alert-success">
+                        ✓ ครบ 30 วันแล้ว สามารถยื่นขอเลื่อนขั้นได้อีกครั้ง
+                      </div>
+                      <div className="alert alert-info" style={{ fontSize: 13 }}>
+                        💡 จำนวนครั้งที่ไม่ผ่านได้ถูก reset เป็น 0 แล้ว
+                      </div>
+                    </>
+                  )}
                 </div>
-                {checks.fraud_check !== null && (
+
+                {checks.eligible !== null && (
                   <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
                     <button className="btn btn-ghost btn-sm" onClick={() => onNavigate("myshop")}>ยกเลิก</button>
-                    <button className="btn btn-primary" disabled={!checks.fraud_check || (targetTier === 3 && !checks.order_check)} onClick={() => setStep(1)}>ถัดไป →</button>
+                    <button className="btn btn-primary" disabled={!checks.eligible} onClick={() => setStep(1)}>ถัดไป →</button>
                   </div>
                 )}
               </div>
             )}
 
-            {/* Step 1: อัปโหลดเอกสาร (UC17) */}
+            {/* Step 1: UC17 ยื่นเอกสาร */}
             {step === 1 && (
               <div className="dash-card">
-                <div className="dash-card-title">UC17: ยื่นเอกสาร</div>
-                <div className="dash-card-sub">อัปโหลดเอกสารตามประเภท ({entityType === "individual" ? "บุคคลธรรมดา" : "นิติบุคคล"})</div>
+                <div className="dash-card-title">ยื่นเอกสาร</div>
+                <div className="dash-card-sub">
+                  กรณี {entityType === "individual" ? "บุคคลธรรมดา" : "นิติบุคคล"} — กรุณาอัปโหลดเอกสารให้ครบถ้วน
+                </div>
                 <div className="alert alert-info" style={{ marginBottom: 20 }}>
                   💡 เอกสารควรถ่ายให้ชัดเจน ตัวอักษรอ่านออก ไม่มีส่วนที่ถูกบัง
                 </div>
@@ -1422,14 +1601,18 @@ function UpgradePage({ user, onNavigate, notify }) {
                 <div className="dash-card-title">ยืนยันการส่งคำขอ</div>
                 <div className="dash-card-sub">ตรวจสอบข้อมูลก่อนส่ง</div>
                 <div style={{ marginBottom: 20 }}>
-                  <div className="detail-row"><div className="detail-label">ขั้นที่ขอ</div><div className="detail-value"><TierBadge tier={targetTier} /></div></div>
+                  <div className="detail-row"><div className="detail-label">ขั้นที่ขอ</div><div className="detail-value"><TierBadge tier={2} /></div></div>
                   <div className="detail-row"><div className="detail-label">ประเภท</div><div className="detail-value">{entityType === "individual" ? "👤 บุคคลธรรมดา" : "🏢 นิติบุคคล"}</div></div>
                   <div className="detail-row">
                     <div className="detail-label">เอกสาร</div>
-                    <div className="detail-value">{Object.values(files).map(f => <div key={f.name} style={{ fontSize: 13, color: "var(--green)" }}>✓ {f.name}</div>)}</div>
+                    <div className="detail-value">
+                      {Object.values(files).map(f => <div key={f.name} style={{ fontSize: 13, color: "var(--green)" }}>✓ {f.name}</div>)}
+                    </div>
                   </div>
                 </div>
-                <div className="alert alert-warn" style={{ marginBottom: 20 }}>⚠️ เมื่อส่งแล้วจะไม่สามารถแก้ไขเอกสารได้</div>
+                <div className="alert alert-warn" style={{ marginBottom: 20 }}>
+                  ⚠️ เมื่อส่งแล้วจะไม่สามารถแก้ไขเอกสารได้ กรุณาตรวจสอบให้เรียบร้อย
+                </div>
                 <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
                   <button className="btn btn-ghost btn-sm" onClick={() => setStep(1)}>← ย้อนกลับ</button>
                   <button className="btn btn-primary" onClick={handleSubmit}>📩 ส่งคำขอ</button>
@@ -1452,6 +1635,7 @@ export default function App() {
   const [notification, setNotification] = useState(null);
   const [homeKey, setHomeKey]   = useState(0);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem("theme") === "dark");
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   // โหลด user จาก localStorage — รวม role field
   const [user, setUser] = useState(() => {
@@ -1467,19 +1651,19 @@ export default function App() {
   const notify = (msg, type = "success") => setNotification({ msg, type });
 
   const navigate = (p, data = null) => {
-    // UC15: ดูโปรไฟล์ — ต้อง login แล้ว ถ้ายังไม่ login redirect กลับ home
+    // UC15: ดูโปรไฟล์ — ต้อง login แล้ว
     if (p === "profile" && !user) {
       notify("กรุณาเข้าสู่ระบบก่อน", "error");
-      return;
-    }
-    // UC19: ร้านของฉัน — ต้องเป็น role="shop" เท่านั้น
-    if (p === "myshop" && (!user || (user.role !== "shop" && user.role !== "admin"))) {
-      notify("ต้องเป็นเจ้าของร้านค้าเท่านั้น", "error");
       return;
     }
     // UC20: ขอเลื่อนขั้น — ต้องเป็น role="shop"
     if (p === "upgrade" && (!user || user.role !== "shop")) {
       notify("ต้องเป็นเจ้าของร้านค้าเท่านั้น", "error");
+      return;
+    }
+    // "myshop": visitor → เปิด login modal แทน navigate
+    if (p === "myshop" && !user) {
+      setShowLoginModal(true);
       return;
     }
     if (p === "home") setHomeKey(k => k + 1);
@@ -1510,6 +1694,34 @@ export default function App() {
       {page === "upgrade"     && <UpgradePage user={user} onNavigate={navigate} notify={notify} />}
 
       {notification && <Notification msg={notification.msg} type={notification.type} onClose={() => setNotification(null)} />}
+
+      {/* Login modal — เปิดเมื่อ visitor กด "ร้านของฉัน" */}
+      {showLoginModal && (
+        <Modal title="เข้าสู่ระบบ" onClose={() => setShowLoginModal(false)}>
+          <div style={{ textAlign: "center", padding: "8px 0 16px" }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>🔒</div>
+            <p style={{ color: "var(--text2)", fontSize: 14, marginBottom: 8 }}>
+              กรุณาเข้าสู่ระบบเพื่อดูร้านค้าของคุณ
+            </p>
+            <p style={{ color: "var(--text3)", fontSize: 13, marginBottom: 24 }}>
+              หากคุณมีร้านค้าในระบบ จะสามารถจัดการร้านได้ทันที
+            </p>
+          </div>
+          <button className="google-btn" onClick={() => {
+            localStorage.setItem("user_token", "mock_token");
+            localStorage.setItem("user_data", JSON.stringify(MOCK_USER));
+            window.location.reload();
+          }}>
+            <svg width="18" height="18" viewBox="0 0 48 48">
+              <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.2l6.7-6.7C35.6 2.3 30.1 0 24 0 14.6 0 6.6 5.4 2.6 13.3l7.8 6.1C12.4 13.2 17.7 9.5 24 9.5z"/>
+              <path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4 7.1-10 7.1-17z"/>
+              <path fill="#FBBC05" d="M10.4 28.6A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.6L2.6 13.3A24 24 0 0 0 0 24c0 3.8.9 7.4 2.6 10.7l7.8-6.1z"/>
+              <path fill="#34A853" d="M24 48c6.1 0 11.2-2 14.9-5.4l-7.5-5.8c-2 1.4-4.7 2.2-7.4 2.2-6.3 0-11.6-3.7-13.6-9.4l-7.8 6.1C6.6 42.6 14.6 48 24 48z"/>
+            </svg>
+            เข้าสู่ระบบด้วย Google
+          </button>
+        </Modal>
+      )}
     </>
   );
 }
