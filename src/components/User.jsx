@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-
+import AboutPage from "./About";
 // ============================================================
 // API CONFIG — เปลี่ยน BASE_URL เป็น PHP server
 // ============================================================
@@ -499,6 +499,7 @@ function Navbar({ user, onNavigate, darkMode, toggleDark, currentPage }) {
         <div className="nav-center">
           <button className={`nav-tab ${currentPage === "home" ? "active" : ""}`} onClick={() => onNavigate("home")}>🏠 หน้าหลัก</button>
           <button className={`nav-tab ${currentPage === "shop-list" ? "active" : ""}`} onClick={() => onNavigate("shop-list")}>🏪 ร้านค้าทั้งหมด</button>
+          <button className={`nav-tab ${currentPage === "about" ? "active" : ""}`} onClick={() => onNavigate("about")}>ℹ️ เกี่ยวกับ</button>
         </div>
 
         <div className="nav-right">
@@ -1692,7 +1693,7 @@ export default function App() {
 
       {/* UC20: ขอเลื่อนขั้น — เฉพาะ role="shop" */}
       {page === "upgrade"     && <UpgradePage user={user} onNavigate={navigate} notify={notify} />}
-
+{page === "about"       && <AboutPage user={user} onNavigate={navigate} darkMode={darkMode} toggleDark={() => setDarkMode(d => !d)} />}
       {notification && <Notification msg={notification.msg} type={notification.type} onClose={() => setNotification(null)} />}
 
       {/* Login modal — เปิดเมื่อ visitor กด "ร้านของฉัน" */}
