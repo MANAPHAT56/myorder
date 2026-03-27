@@ -6,3 +6,15 @@ export default defineConfig({
   plugins: [react()],
   base : '/myorder/',
 })
+frontend/vite.config.js
+// import { defineConfig } from 'vite'
+// import react from '@vitejs/plugin-react'
+
+// export default defineConfig({
+//   plugins: [react()],
+//   base: '/',  // 👈 เปลี่ยนจาก '/myorder/' เป็น '/'
+//   server: {
+//     host: true,
+//     port: 5173
+//   }
+// })
