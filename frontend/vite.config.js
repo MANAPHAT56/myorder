@@ -15,6 +15,9 @@ export default defineConfig({
   base: '/',  // 👈 เปลี่ยนจาก '/myorder/' เป็น '/'
   server: {
     host: true,
-    port: 5173
+    port: 5173,
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+    },
   }
 })

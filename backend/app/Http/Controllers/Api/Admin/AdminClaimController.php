@@ -21,11 +21,31 @@ class AdminClaimController extends Controller
     }
 
     /** PATCH /api/v1/admin/claims/{id}/resolve */
-    public function resolve(Request $request, int $id)
-    {
-        $claim = ClaimRequest::findOrFail($id);
-        $claim->update(['status' => 'resolved']);
+   public function resolve(Request $request, int $id)
+{
+    $request->validate([
+        'resolution'    => 'required|in:REFUNDED,REJECTED,NOTED',
+        'refund_amount' => 'nullable|numeric|min:0',
+        'admin_note'    => 'nullable|string|max:500',
+    ]);
 
-        return response()->json(['message' => 'ปิดคำร้องเคลมเรียบร้อย']);
-    }
+    $claim = ClaimRequest::findOrFail($id);
+    $claim->update(['status' => 'resolved']);
+
+    AdminActionLog::create([
+        'admin_id'    => $request->user()->id,
+        'action_type' => 'RESOLVE_CLAIM',
+        'target_type' => 'claim_requests',
+        'target_id'   => (string) $claim->id,
+        'details'     => [
+            'resolution'    => $request->resolution,
+            'refund_amount' => $request->refund_amount,
+            'admin_note'    => $request->admin_note,
+        ],
+        'ip_address' => $request->ip(),
+        'created_at' => now(),
+    ]);
+
+    return response()->json(['message' => 'ปิดคำร้องเคลมเรียบร้อย']);
+}
 }

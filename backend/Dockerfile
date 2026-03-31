@@ -1,37 +1,23 @@
+# ใช้ PHP เวอร์ชั่นที่มี Apache มาให้
 FROM php:8.2-apache
 
-# ติดตั้ง extensions
+# 1. เปลี่ยน DocumentRoot ของ Apache ให้ชี้ไปที่โฟลเดอร์ /public ของ Laravel
+ENV APACHE_DOCUMENT_ROOT /var/www/html/public
+
+RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
+RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
+
+# 👇 2. [ส่วนที่เพิ่มใหม่] บังคับให้ Apache อนุญาตการทำงานของไฟล์ .htaccess
+RUN sed -i 's/AllowOverride None/AllowOverride All/g' /etc/apache2/apache2.conf
+
+# 3. เปิดใช้งาน mod_rewrite (สำคัญมาก! สำหรับ Route ของ Laravel)
+RUN a2enmod rewrite
+
+# 4. ติดตั้ง Extension ของ PHP ที่จำเป็นสำหรับ Laravel และ Database
 RUN apt-get update && apt-get install -y \
-    libpng-dev \
-    libjpeg-dev \
-    libfreetype6-dev \
     libzip-dev \
-    unzip \
-    git \
-    && docker-php-ext-install mysqli pdo pdo_mysql gd zip \
-    && a2enmod rewrite
+    zip \
+    && docker-php-ext-install pdo_mysql zip
 
-# ติดตั้ง Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-
-# ก๊อปปี้โค้ด Laravel
-COPY . /var/www/html/
-
-# ตั้งค่า document root
-RUN sed -ri 's!/var/www/html!/var/www/html/public!g' /etc/apache2/sites-available/000-default.conf
-
-# สร้างโฟลเดอร์ที่จำเป็น
-RUN mkdir -p /var/www/html/storage/framework/{sessions,views,cache} \
-    && mkdir -p /var/www/html/bootstrap/cache
-
-# ตั้งค่า permission
-RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 775 /var/www/html/storage \
-    && chmod -R 775 /var/www/html/bootstrap/cache
-
+# ตั้งค่า Working Directory
 WORKDIR /var/www/html
-
-EXPOSE 80
-
-# ไม่ต้องติดตั้ง dependencies ที่นี่
-CMD ["apache2-foreground"]

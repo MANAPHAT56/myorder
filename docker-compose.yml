@@ -15,6 +15,20 @@ services:
     networks:
       - app-network
 
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: phpmyadmin
+    restart: always
+    ports:
+      - "8081:80"
+    environment:
+      - PMA_HOST=db
+      - MYSQL_ROOT_PASSWORD=rootpassword
+    depends_on:
+      - db
+    networks:
+      - app-network
+
   backend:
     build:
       context: ./backend
@@ -27,12 +41,15 @@ services:
     environment:
       - APP_ENV=local
       - APP_DEBUG=true
+      - APP_URL=http://localhost:8080
+      - FRONTEND_URL=http://localhost:5173
       - DB_HOST=db
       - DB_PORT=3306
       - DB_DATABASE=my_database
       - DB_USERNAME=root
       - DB_PASSWORD=rootpassword
-      - COMPOSER_PROCESS_TIMEOUT=2000 # เพิ่มบรรทัดนี้ลงไป
+      - COMPOSER_PROCESS_TIMEOUT=2000
+      - CORS_ALLOWED_ORIGINS=http://localhost:5173,http://react_frontend:5173
     depends_on:
       - db
     networks:
@@ -44,7 +61,9 @@ services:
       dockerfile: Dockerfile
     container_name: react_frontend
     ports:
-      - "3000:80"
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8080  # หรือ http://php_backend:80
     depends_on:
       - backend
     networks:

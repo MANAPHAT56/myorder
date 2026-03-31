@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\UpgradeRequestResource;
 use App\Models\UpgradeRequest;
-use App\Models\UpgradeApprovalLog;
+use App\Models\AdminActionLog;
 use Illuminate\Http\Request;
 
 /**
@@ -30,20 +30,33 @@ class AdminUpgradeController extends Controller
      */
     public function approve(Request $request, int $id)
     {
+        $request->validate([
+            'admin_remark' => 'nullable|string|max:500',
+        ]);
+
         $upgradeReq = UpgradeRequest::where('status', 'pending')->findOrFail($id);
         $shop       = $upgradeReq->shop;
 
         $upgradeReq->update(['status' => 'approved']);
+
         $shop->update([
-            'shop_status'         => 'TIER2',
+            'current_tier'         => 'TIER_2',
             'failed_upgrade_count' => 0,
         ]);
 
-        UpgradeApprovalLog::create([
-            'upgrade_request_id' => $upgradeReq->id,
-            'shop_ref_id'        => $shop->ref_id,
-            'admin_account_id'   => $request->user()->id,
-            'action'             => 'approved',
+        AdminActionLog::create([
+            'admin_id'    => $request->user()->id,
+            'action_type' => 'APPROVE_TIER',
+            'target_type' => 'upgrade_requests',
+            'target_id'   => (string) $upgradeReq->id,
+            'details'     => [
+                'shop_ref_id'  => $shop->ref_id,
+                'old_tier'     => 'TIER_1',
+                'new_tier'     => 'TIER_2',
+                'admin_remark' => $request->admin_remark,
+            ],
+            'ip_address' => $request->ip(),
+            'created_at' => now(),
         ]);
 
         return response()->json(['message' => "อนุมัติคำขอของ \"{$shop->name}\" แล้ว"]);
@@ -65,15 +78,19 @@ class AdminUpgradeController extends Controller
             'admin_remark' => $request->reason,
         ]);
 
-        // เพิ่ม failed_count และบันทึกวันที่ reject ล่าสุด
         $shop->increment('failed_upgrade_count');
 
-        UpgradeApprovalLog::create([
-            'upgrade_request_id' => $upgradeReq->id,
-            'shop_ref_id'        => $shop->ref_id,
-            'admin_account_id'   => $request->user()->id,
-            'action'             => 'rejected',
-            'reason'             => $request->reason,
+        AdminActionLog::create([
+            'admin_id'    => $request->user()->id,
+            'action_type' => 'REJECT_TIER',
+            'target_type' => 'upgrade_requests',
+            'target_id'   => (string) $upgradeReq->id,
+            'details'     => [
+                'shop_ref_id' => $shop->ref_id,
+                'reason'      => $request->reason,
+            ],
+            'ip_address' => $request->ip(),
+            'created_at' => now(),
         ]);
 
         return response()->json(['message' => "ปฏิเสธคำขอของ \"{$shop->name}\""]);

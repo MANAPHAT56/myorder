@@ -22,15 +22,16 @@ class ClaimController extends Controller
      */
     public function store(StoreClaimRequest $request, string $refId)
     {
-        $shop = Shop::where('ref_id', $refId)
-            ->where('is_deleted', false)
-            ->firstOrFail();
-
+       $shop = Shop::where('ref_id', $refId)
+    ->whereNull('deleted_at')      // ✅
+    ->firstOrFail();
         $claim = ClaimRequest::create([
             'claimer_account_id' => $request->user()->id,
             'shop_ref_id'        => $shop->ref_id,
             'contact_info'       => $request->contact_info,
             'status'             => 'pending',
+               'fraud_type_id'      => $request->fraud_type_id,  // ← ขาด
+    'reason'             => $request->reason,           // ← ขาด
         ]);
 
         // UC17: หลักฐาน
@@ -44,4 +45,5 @@ class ClaimController extends Controller
 
         return response()->json(['message' => 'ส่งเรื่องเคลมเรียบร้อยแล้ว ทีมงานจะติดต่อกลับ'], 201);
     }
+
 }

@@ -1,37 +1,21 @@
 # Stage 1: Build
 FROM node:20-alpine AS builder
-
 WORKDIR /app
-
-# ติดตั้ง dependencies
 COPY package*.json ./
 RUN npm install
-
-# ก๊อปปี้ source code และ build
 COPY . .
 RUN npm run build
 
-# Stage 2: Production with nginx
-FROM nginx:alpine
+# Stage 2: Production
+FROM node:20-alpine
+WORKDIR /app
 
-# ก๊อปปี้ไฟล์ที่ build แล้ว
-COPY --from=builder /app/dist /usr/share/nginx/html
+# Install serve
+RUN npm install -g serve
 
-# สร้าง nginx config เพื่อรองรับ React Router
-RUN echo 'server { \
-    listen 80; \
-    server_name localhost; \
-    root /usr/share/nginx/html; \
-    index index.html; \
-    location / { \
-        try_files $uri $uri/ /index.html; \
-    } \
-    location /assets/ { \
-        expires 1y; \
-        add_header Cache-Control "public, immutable"; \
-    } \
-}' > /etc/nginx/conf.d/default.conf
+# Copy built files
+COPY --from=builder /app/dist /app/dist
 
-EXPOSE 80
+EXPOSE 5173
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["serve", "-s", "dist", "-l", "5173"]

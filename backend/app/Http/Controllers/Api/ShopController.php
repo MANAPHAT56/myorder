@@ -65,7 +65,7 @@ class ShopController extends Controller
     public function upgradeRequests(string $refId)
     {
         $shop = Shop::where('ref_id', $refId)
-            ->where('is_deleted', false)
+            ->whereNull('deleted_at')
             ->firstOrFail();
 
         $requests = UpgradeRequest::where('shop_ref_id', $shop->ref_id)

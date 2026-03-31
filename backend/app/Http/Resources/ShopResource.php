@@ -11,11 +11,11 @@ class ShopResource extends JsonResource
             'name'                 => $this->name,
             'channel'              => $this->channel,
             'url'                  => $this->url,
-            'shop_status'          => $this->shop_status,   // NORMAL|TIER2|TIER3
+            'current_tier'    => $this->current_tier,   // NORMAL|TIER2|TIER3
             'tier'                 => $this->getTier(),      // 1|2|3
             'is_active'            => $this->is_active,
             'is_blacklist'         => (bool) $this->is_blacklist,
-            'is_deleted'           => (bool) $this->is_deleted,
+            'deleted_at'           => $this->deleted_at?->format('d/m/Y'),
             'failed_upgrade_count' => $this->failed_upgrade_count,
             'owner_account_id'     => $this->owner_account_id,
             'created_at'           => $this->created_at?->format('d/m/Y'),
@@ -27,7 +27,7 @@ class ShopResource extends JsonResource
 
     private function getTier(): int
     {
-        return match ($this->shop_status) {
+        return match ($this->current_tier) {
             'TIER3'     => 3,
             'TIER2'     => 2,
             default     => 1,

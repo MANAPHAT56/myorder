@@ -59,37 +59,59 @@ class AdminShopController extends Controller
     }
 
     /** UC5: DELETE /api/v1/admin/shops/{ref_id} */
-    public function destroy(string $refId)
-    {
-        $shop = Shop::where('ref_id', $refId)->firstOrFail();
-        $shop->update(['is_deleted' => true]);
-        return response()->json(['message' => 'ลบร้านค้าเรียบร้อยแล้ว']);
-    }
+    public function destroy(Request $request, string $refId)
+{
+    $request->validate(['reason' => 'nullable|string|max:255']);
+
+    $shop = Shop::where('ref_id', $refId)->firstOrFail();
+    $shop->delete(); // SoftDeletes trait
+
+    AdminActionLog::create([
+        'admin_id'    => $request->user()->id,
+        'action_type' => 'DELETE_SHOP',
+        'target_type' => 'shops',
+        'target_id'   => $shop->ref_id,
+        'details'     => ['shop_name' => $shop->name, 'reason' => $request->reason],
+        'ip_address'  => $request->ip(),
+        'created_at'  => now(),
+    ]);
+
+    return response()->json(['message' => 'ลบร้านค้าเรียบร้อยแล้ว']);
+}
 
     /**
      * UC7: เพิ่ม Blacklist
      * POST /api/v1/admin/shops/{ref_id}/blacklist
      */
-    public function blacklist(Request $request, string $refId)
-    {
-        $request->validate([
-            'reason'            => 'required|string|max:500',
-            'report_request_id' => 'nullable|exists:report_requests,id',
-        ]);
+   public function blacklist(Request $request, string $refId)
+{
+    $request->validate([
+        'reason'           => 'required|string|max:500',
+        'claim_request_id' => 'nullable|exists:claim_requests,id',
+    ]);
 
-        $shop = Shop::where('ref_id', $refId)->firstOrFail();
+    $shop = Shop::where('ref_id', $refId)->firstOrFail();
+    $shop->update(['is_blacklist' => true]);
 
-        $shop->update(['is_blacklist' => true]);
+    Blacklist::create([
+        'shop_ref_id'      => $shop->ref_id,
+        'admin_account_id' => $request->user()->id,
+        'claim_request_id' => $request->claim_request_id,
+        'reason'           => $request->reason,
+    ]);
 
-        Blacklist::create([
-            'shop_ref_id'       => $shop->ref_id,
-            'admin_account_id'  => $request->user()->id,
-            'report_request_id' => $request->report_request_id,
-            'reason'            => $request->reason,
-        ]);
+    AdminActionLog::create([
+        'admin_id'    => $request->user()->id,
+        'action_type' => 'ADD_BLACKLIST',
+        'target_type' => 'shops',
+        'target_id'   => $shop->ref_id,
+        'details'     => ['claim_request_id' => $request->claim_request_id, 'reason' => $request->reason],
+        'ip_address'  => $request->ip(),
+        'created_at'  => now(),
+    ]);
 
-        return response()->json(['message' => "เพิ่ม \"{$shop->name}\" ใน Blacklist แล้ว"]);
-    }
+    return response()->json(['message' => "เพิ่ม \"{$shop->name}\" ใน Blacklist แล้ว"]);
+}
 
     /**
      * UC9: เลื่อนขั้น 3 (admin ทดลองสั่งของแล้ว)
@@ -98,11 +120,9 @@ class AdminShopController extends Controller
     public function promoteTier3(Request $request, string $refId)
     {
         $shop = Shop::where('ref_id', $refId)
-            ->where('shop_status', 'TIER2')
-            ->firstOrFail();
-
-        $shop->update(['shop_status' => 'TIER3']);
-
+    ->where('current_tier', 'TIER_2') // ← ชื่อจริงใน schema
+    ->firstOrFail();
+$shop->update(['current_tier' => 'TIER_3']);
         return response()->json(['message' => "เลื่อน \"{$shop->name}\" เป็นขั้น 3 เรียบร้อย"]);
     }
 }

@@ -1,40 +1,20 @@
 <?php
-// ตั้งค่าให้ส่งกลับเป็น JSON และอนุญาตให้ React (port 3000) ดึงข้อมูลได้ (CORS)
-header('Content-Type: application/json');
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 
-// อ่านค่า URL ที่ React ยิงมา
-$uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+use Illuminate\Foundation\Application;
+use Illuminate\Http\Request;
 
-// จำลองการแยก Route
-if ($uri === '/api/shops/featured') {
-    
-    echo json_encode([
-        'status' => 'success',
-        'data' => [
-            ['id' => 1, 'name' => 'ร้านค้าแนะนำ 1'],
-            ['id' => 2, 'name' => 'ร้านค้าแนะนำ 2']
-        ]
-    ]);
+define('LARAVEL_START', microtime(true));
 
-} elseif ($uri === '/api/shops') {
-    
-    // รับค่าตัวแปรจาก URL เช่น ?q=oko&tier=all
-    $search = $_GET['q'] ?? '';
-    
-    echo json_encode([
-        'status' => 'success',
-        'message' => 'ค้นหาร้านค้า: ' . $search,
-        'data' => []
-    ]);
-
-} else {
-    // ถ้าเรียก URL อื่นๆ ที่เราไม่ได้เตรียมไว้
-    http_response_code(404);
-    echo json_encode([
-        'status' => 'error',
-        'message' => 'API Not Found'
-    ]);
+// Determine if the application is in maintenance mode...
+if (file_exists($maintenance = __DIR__.'/../storage/framework/maintenance.php')) {
+    require $maintenance;
 }
-?>
+
+// Register the Composer autoloader...
+require __DIR__.'/../vendor/autoload.php';
+
+// Bootstrap Laravel and handle the request...
+/** @var Application $app */
+$app = require_once __DIR__.'/../bootstrap/app.php';
+
+$app->handleRequest(Request::capture());

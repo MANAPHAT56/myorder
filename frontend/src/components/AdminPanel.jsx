@@ -1,73 +1,69 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
-// ============================================================
-// ADMIN PANEL — UC1-UC11
-// Backend: http://localhost:5000/api/v1
-// ============================================================
-
-const API_BASE = "http://localhost:8080/api";
+const API_BASE = "http://localhost:8080/api/v1";
 const ITEMS_PER_PAGE = 8;
 const INVALID_CHARS  = /[^\u0E00-\u0E7Fa-zA-Z0-9\s\-_.@/:,()]/;
 
-// ── Auth helpers ──────────────────────────────────────────────
 const authHeaders = () => {
   const t = localStorage.getItem("user_token");
-  return t ? { Authorization: `Bearer ${t}` } : {};
+  return {
+    Accept: "application/json",
+    ...(t ? { Authorization: `Bearer ${t}` } : {}),
+  };
 };
-
 const jsonHeaders = () => ({
   "Content-Type": "application/json",
+  Accept: "application/json",
   ...authHeaders(),
 });
+const handleResponse = async (response) => {
+  const data = await response.json().catch(() => ({})); 
+  if (!response.ok) {
+    throw new Error(data.message || "เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
+  }
+  return data;
+};
 
-// ── API calls ─────────────────────────────────────────────────
 const adminApi = {
-  // Dashboard stats
   getDashboard: () =>
     fetch(`${API_BASE}/admin/dashboard`, { headers: authHeaders() }).then(r => r.json()),
 
-  // UC6: รายการร้านค้า
   getShops: (params) =>
     fetch(`${API_BASE}/admin/shops?${new URLSearchParams(params)}`, { headers: authHeaders() }).then(r => r.json()),
 
-  // UC3: เพิ่มร้านค้า
   createShop: (data) =>
     fetch(`${API_BASE}/admin/shops`, {
       method: "POST", headers: jsonHeaders(), body: JSON.stringify(data),
     }).then(r => r.json()),
 
-  // UC4: แก้ไขข้อมูลร้านค้า
   updateShop: (refId, data) =>
     fetch(`${API_BASE}/admin/shops/${refId}`, {
       method: "PATCH", headers: jsonHeaders(), body: JSON.stringify(data),
     }).then(r => r.json()),
 
-  // UC5: ลบร้านค้า
-  deleteShop: (refId) =>
+  deleteShop: (refId, reason) =>
     fetch(`${API_BASE}/admin/shops/${refId}`, {
-      method: "DELETE", headers: authHeaders(),
+      method: "DELETE", headers: jsonHeaders(), body: JSON.stringify({ reason }),
     }).then(r => r.json()),
 
-  // UC7: Blacklist
-  blacklistShop: (refId, reason, reportRequestId = null) =>
+  // claim_request_id (ไม่ใช่ report_request_id)
+  blacklistShop: (refId, reason, claimRequestId = null) =>
     fetch(`${API_BASE}/admin/shops/${refId}/blacklist`, {
       method: "POST", headers: jsonHeaders(),
-      body: JSON.stringify({ reason, report_request_id: reportRequestId }),
+      body: JSON.stringify({ reason, claim_request_id: claimRequestId }),
     }).then(r => r.json()),
 
-  // UC9: เลื่อนขั้น 3
   promoteTier3: (refId) =>
     fetch(`${API_BASE}/admin/shops/${refId}/tier3`, {
       method: "PATCH", headers: authHeaders(),
     }).then(r => r.json()),
 
-  // UC10: คำร้องขอเลื่อนขั้น
   getUpgradeRequests: (params) =>
     fetch(`${API_BASE}/admin/upgrade-requests?${new URLSearchParams(params)}`, { headers: authHeaders() }).then(r => r.json()),
 
-  approveUpgrade: (id) =>
+  approveUpgrade: (id, adminRemark = "") =>
     fetch(`${API_BASE}/admin/upgrade-requests/${id}/approve`, {
-      method: "PATCH", headers: authHeaders(),
+      method: "PATCH", headers: jsonHeaders(), body: JSON.stringify({ admin_remark: adminRemark }),
     }).then(r => r.json()),
 
   rejectUpgrade: (id, reason) =>
@@ -75,32 +71,17 @@ const adminApi = {
       method: "PATCH", headers: jsonHeaders(), body: JSON.stringify({ reason }),
     }).then(r => r.json()),
 
-  // UC2: รายงาน
-  getReports: (params) =>
-    fetch(`${API_BASE}/admin/reports?${new URLSearchParams(params)}`, { headers: authHeaders() }).then(r => r.json()),
-
-  resolveReport: (id) =>
-    fetch(`${API_BASE}/admin/reports/${id}/resolve`, {
-      method: "PATCH", headers: authHeaders(),
-    }).then(r => r.json()),
-
-  // UC11: เคลม
   getClaims: (params) =>
     fetch(`${API_BASE}/admin/claims?${new URLSearchParams(params)}`, { headers: authHeaders() }).then(r => r.json()),
 
-  resolveClaim: (id) =>
+  // รับ resolution, refund_amount, admin_note
+  resolveClaim: (id, resolution, refundAmount = null, adminNote = "") =>
     fetch(`${API_BASE}/admin/claims/${id}/resolve`, {
-      method: "PATCH", headers: authHeaders(),
+      method: "PATCH", headers: jsonHeaders(),
+      body: JSON.stringify({ resolution, refund_amount: refundAmount, admin_note: adminNote }),
     }).then(r => r.json()),
-
-  // signed URL สำหรับดูเอกสาร (ถ้า backend รองรับ)
-  getAttachmentUrl: (path) =>
-    fetch(`${API_BASE}/admin/attachments/url?path=${encodeURIComponent(path)}`, { headers: authHeaders() })
-      .then(r => r.json())
-      .then(d => d.url ?? path),
 };
 
-// ── Validation ────────────────────────────────────────────────
 function validateText(val) {
   if (!val || val.trim() === "") return "กรุณากรอกข้อมูลให้ครบถ้วน";
   if (INVALID_CHARS.test(val)) return "ไม่อนุญาตให้ใช้อักขระพิเศษหรืออีโมจิ";
@@ -116,37 +97,34 @@ function validateUserId(val) {
   return null;
 }
 
-// ── Attachment helper — แปลง file_url เป็น previewable doc ──
 function makeDocFromAttachment(att) {
-  const url      = att.file_url ?? att.url ?? "";
-  const isPdf    = url.toLowerCase().endsWith(".pdf");
+  const url   = att.file_url ?? att.url ?? "";
+  const isPdf = url.toLowerCase().endsWith(".pdf");
   return {
-    id:         att.id,
-    name:       url.split("/").pop(),
-    label:      att.label ?? url.split("/").pop(),
-    fileType:   isPdf ? "pdf" : "image",
-    previewUrl: isPdf ? null : url,  // ในระบบจริง: signed URL จาก backend
+    id: att.id, name: url.split("/").pop(),
+    label: att.label ?? url.split("/").pop(),
+    fileType: isPdf ? "pdf" : "image",
+    previewUrl: isPdf ? null : url,
   };
 }
 
-// ============================================================
-// STYLES
-// ============================================================
+// current_tier จาก schema (TIER_1, TIER_2, TIER_3)
+const tierOf = (s) =>
+  s.current_tier === "TIER_3" ? 3 : s.current_tier === "TIER_2" ? 2 : 1;
+
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&family=Mitr:wght@300;400;500;600&display=swap');
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
   :root {
-    --bg:#f4f1ec; --surface:#ffffff; --surface2:#f0ece4; --border:#e5ddd0; --border2:#ccc5b5;
-    --accent:#c0392b; --accent2:#a93226; --accent-light:#fdf2f1; --accent-glow:rgba(192,57,43,0.12);
-    --green:#16a34a; --green-light:#f0fdf4; --yellow:#d97706; --yellow-light:#fffbeb;
-    --blue:#1d4ed8; --blue-light:#eff6ff; --red:#dc2626; --red-light:#fef2f2;
-    --text:#18130e; --text2:#584f42; --text3:#96887a;
+    --bg:#f4f1ec;--surface:#ffffff;--surface2:#f0ece4;--border:#e5ddd0;--border2:#ccc5b5;
+    --accent:#c0392b;--accent2:#a93226;--accent-light:#fdf2f1;--accent-glow:rgba(192,57,43,0.12);
+    --green:#16a34a;--green-light:#f0fdf4;--yellow:#d97706;--yellow-light:#fffbeb;
+    --blue:#1d4ed8;--blue-light:#eff6ff;--red:#dc2626;--red-light:#fef2f2;
+    --text:#18130e;--text2:#584f42;--text3:#96887a;
     --shadow:0 1px 3px rgba(0,0,0,0.06),0 4px 16px rgba(0,0,0,0.04);
-    --shadow-md:0 4px 20px rgba(0,0,0,0.08);
-    --shadow-lg:0 8px 40px rgba(0,0,0,0.14);
-    --font:'Sarabun',sans-serif; --display:'Mitr',sans-serif;
-    --radius:12px; --radius-sm:8px;
-    --sidebar-w:220px;
+    --shadow-md:0 4px 20px rgba(0,0,0,0.08);--shadow-lg:0 8px 40px rgba(0,0,0,0.14);
+    --font:'Sarabun',sans-serif;--display:'Mitr',sans-serif;
+    --radius:12px;--radius-sm:8px;--sidebar-w:220px;
   }
   html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.6;}
   .admin-layout{display:flex;min-height:100vh;}
@@ -232,8 +210,6 @@ const styles = `
   .page-btn:hover:not(:disabled){background:var(--surface2);}
   .page-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
   .page-btn:disabled{opacity:0.3;cursor:not-allowed;}
-  .divider{border:none;border-top:1px solid var(--border);margin:16px 0;}
-  /* DOC VIEWER */
   .doc-viewer-overlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.88);display:flex;flex-direction:column;animation:fadeIn 0.18s ease;}
   .doc-viewer-topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:rgba(255,255,255,0.06);border-bottom:1px solid rgba(255,255,255,0.1);flex-shrink:0;}
   .doc-viewer-title{font-family:var(--display);font-size:15px;font-weight:600;color:#f0ede8;display:flex;align-items:center;gap:10px;}
@@ -248,13 +224,9 @@ const styles = `
   .doc-thumb-btn.active{background:rgba(249,115,22,0.2);border-color:rgba(249,115,22,0.5);color:#fb923c;}
   .doc-viewer-main{flex:1;overflow:hidden;display:flex;align-items:center;justify-content:center;position:relative;cursor:grab;user-select:none;}
   .doc-viewer-main.grabbing{cursor:grabbing;}
-  .doc-viewer-main.zoom-in-cursor{cursor:zoom-in;}
   .doc-img-wrap{transition:transform 0.05s linear;transform-origin:center center;display:flex;align-items:center;justify-content:center;}
   .doc-img{max-width:90vw;max-height:78vh;border-radius:6px;box-shadow:0 8px 48px rgba(0,0,0,0.6);display:block;pointer-events:none;object-fit:contain;}
   .doc-pdf-placeholder{background:#fff;border-radius:10px;padding:40px 60px;text-align:center;box-shadow:0 8px 48px rgba(0,0,0,0.6);}
-  .doc-pdf-icon{font-size:56px;margin-bottom:14px;}
-  .doc-pdf-name{font-size:15px;font-weight:700;color:#333;margin-bottom:6px;}
-  .doc-pdf-sub{font-size:12px;color:#888;}
   .doc-viewer-body{flex:1;display:flex;overflow:hidden;}
   .doc-page-indicator{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.55);border-radius:100px;padding:4px 14px;font-size:12px;color:#ccc;font-family:var(--font);pointer-events:none;}
   .doc-item{display:flex;justify-content:space-between;align-items:center;background:var(--surface2);padding:10px 14px;border-radius:10px;border:1px solid var(--border);margin-bottom:8px;}
@@ -263,16 +235,15 @@ const styles = `
   .doc-item-name{font-size:11px;color:var(--text3);}
   .doc-view-btn{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:6px;background:var(--blue-light);color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;border:1px solid rgba(29,78,216,0.18);transition:background 0.15s;font-family:var(--font);}
   .doc-view-btn:hover{background:rgba(29,78,216,0.14);}
+  .skeleton-row td{background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:400px 100%;animation:shimmer 1.4s infinite linear;}
+  select.input{cursor:pointer;}
   @keyframes fadeIn{from{opacity:0}to{opacity:1}}
   @keyframes slideUp{from{transform:translateY(12px);opacity:0}to{transform:translateY(0);opacity:1}}
   @keyframes slideIn{from{transform:translateX(14px);opacity:0}to{transform:translateX(0);opacity:1}}
-  .skeleton-row td{background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:400px 100%;animation:shimmer 1.4s infinite linear;}
   @keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
 `;
 
-// ============================================================
-// HELPERS
-// ============================================================
+// ── Helpers ──────────────────────────────────────────────────
 function TierBadge({ tier }) {
   const map = { 1:["badge-tier1","⚪ ขั้น 1"], 2:["badge-tier2","🔵 ขั้น 2"], 3:["badge-tier3","🥇 ขั้น 3"] };
   const [cls, label] = map[tier] || map[1];
@@ -319,16 +290,14 @@ function SkeletonRows({ cols = 6, rows = 4 }) {
   ));
 }
 
-// ============================================================
-// DOC VIEWER
-// ============================================================
+// ── Doc Viewer ───────────────────────────────────────────────
 const ZOOM_LEVELS = [0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3];
 const DEFAULT_ZOOM_IDX = 2;
 
 function DocViewer({ docs, initialIndex = 0, onClose }) {
   const [docIdx, setDocIdx]   = useState(initialIndex);
   const [zoomIdx, setZoomIdx] = useState(DEFAULT_ZOOM_IDX);
-  const [pan, setPan]         = useState({ x: 0, y: 0 });
+  const [pan, setPan]         = useState({ x:0, y:0 });
   const [dragging, setDragging] = useState(false);
   const dragStart = useRef(null);
   const mainRef   = useRef(null);
@@ -336,7 +305,6 @@ function DocViewer({ docs, initialIndex = 0, onClose }) {
   const zoom = ZOOM_LEVELS[zoomIdx];
 
   useEffect(() => { setZoomIdx(DEFAULT_ZOOM_IDX); setPan({ x:0, y:0 }); }, [docIdx]);
-
   useEffect(() => {
     const handler = (e) => {
       if (e.key==="Escape") onClose();
@@ -358,7 +326,7 @@ function DocViewer({ docs, initialIndex = 0, onClose }) {
   useEffect(() => {
     const el = mainRef.current;
     if (!el) return;
-    el.addEventListener("wheel", handleWheel, { passive: false });
+    el.addEventListener("wheel", handleWheel, { passive:false });
     return () => el.removeEventListener("wheel", handleWheel);
   }, [handleWheel]);
 
@@ -380,7 +348,6 @@ function DocViewer({ docs, initialIndex = 0, onClose }) {
         <div className="doc-viewer-title">
           <span style={{fontSize:18}}>{doc.fileType==="pdf"?"📄":"🖼️"}</span>
           <span>{doc.label}</span>
-          <span style={{fontSize:12,opacity:0.5,fontFamily:"var(--font)",fontWeight:400}}>{doc.name}</span>
           {docs.length>1 && <span style={{fontSize:12,color:"#9a8a7a"}}>({docIdx+1}/{docs.length})</span>}
         </div>
         <div className="doc-viewer-controls">
@@ -388,7 +355,6 @@ function DocViewer({ docs, initialIndex = 0, onClose }) {
           <span className="doc-zoom-label">{Math.round(zoom*100)}%</span>
           <button className="doc-ctrl-btn" onClick={()=>setZoomIdx(i=>Math.min(i+1,ZOOM_LEVELS.length-1))} disabled={zoomIdx===ZOOM_LEVELS.length-1}>+</button>
           <button className="doc-ctrl-btn" onClick={()=>{setZoomIdx(DEFAULT_ZOOM_IDX);setPan({x:0,y:0})}} style={{fontSize:13}}>⊙</button>
-          <div style={{width:1,height:24,background:"rgba(255,255,255,0.15)",margin:"0 4px"}}/>
           {docs.length>1 && <>
             <button className="doc-ctrl-btn" onClick={()=>setDocIdx(i=>Math.max(i-1,0))} disabled={docIdx===0}>‹</button>
             <button className="doc-ctrl-btn" onClick={()=>setDocIdx(i=>Math.min(i+1,docs.length-1))} disabled={docIdx===docs.length-1}>›</button>
@@ -399,32 +365,29 @@ function DocViewer({ docs, initialIndex = 0, onClose }) {
       <div className="doc-viewer-body">
         {docs.length>1 && (
           <div className="doc-viewer-sidebar">
-            <div style={{fontSize:10,fontWeight:700,color:"#6b5d4e",textTransform:"uppercase",letterSpacing:"0.1em",padding:"0 4px 8px"}}>เอกสาร</div>
             {docs.map((d,i) => (
               <button key={i} className={`doc-thumb-btn ${i===docIdx?"active":""}`} onClick={()=>setDocIdx(i)}>
                 <span style={{fontSize:15}}>{d.fileType==="pdf"?"📄":"🖼️"}</span>
                 <span style={{display:"block",marginTop:3,fontSize:11}}>{d.label}</span>
-                <span style={{display:"block",fontSize:10,opacity:0.6}}>{d.name}</span>
               </button>
             ))}
           </div>
         )}
-        <div ref={mainRef} className={`doc-viewer-main ${dragging?"grabbing":zoom>1?"":"zoom-in-cursor"}`}
+        <div ref={mainRef} className={`doc-viewer-main ${dragging?"grabbing":""}`}
           onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerLeave={onPointerUp}
-          onDoubleClick={()=>{ if(zoomIdx<ZOOM_LEVELS.length-1) setZoomIdx(i=>i+1); else{setZoomIdx(DEFAULT_ZOOM_IDX);setPan({x:0,y:0}); }}}>
+          onDoubleClick={()=>{ if(zoomIdx<ZOOM_LEVELS.length-1) setZoomIdx(i=>i+1); else{setZoomIdx(DEFAULT_ZOOM_IDX);setPan({x:0,y:0});} }}>
           <div className="doc-img-wrap" style={{transform:`scale(${zoom}) translate(${pan.x/zoom}px,${pan.y/zoom}px)`}}>
             {doc.fileType==="pdf" ? (
               <div className="doc-pdf-placeholder">
-                <div className="doc-pdf-icon">📄</div>
-                <div className="doc-pdf-name">{doc.name}</div>
-                <div className="doc-pdf-sub">{doc.label}</div>
-                <div style={{marginTop:16,fontSize:12,color:"#888"}}>ไฟล์ PDF — ในระบบจริงจะแสดง PDF viewer</div>
+                <div style={{fontSize:56,marginBottom:14}}>📄</div>
+                <div style={{fontSize:15,fontWeight:700,color:"#333",marginBottom:6}}>{doc.name}</div>
+                <div style={{fontSize:12,color:"#888"}}>{doc.label}</div>
               </div>
             ) : (
               <img className="doc-img" src={doc.previewUrl} alt={doc.label} draggable={false} />
             )}
           </div>
-          <div className="doc-page-indicator">scroll เพื่อซูม · ดับเบิ้ลคลิกซูมเข้า · ลากเพื่อเลื่อน · Esc ปิด</div>
+          <div className="doc-page-indicator">scroll ซูม · ดับเบิ้ลคลิกซูมเข้า · ลากเลื่อน · Esc ปิด</div>
         </div>
       </div>
     </div>
@@ -448,17 +411,15 @@ function DocList({ docs, onView }) {
   );
 }
 
-// ============================================================
-// SIDEBAR
-// ============================================================
+// ── Sidebar — ลบ reports ออก ─────────────────────────────────
 const NAV_ITEMS = [
   { id:"dashboard",        icon:"📊", label:"ภาพรวม",            section:"ภาพรวม" },
   { id:"shops",            icon:"🏪", label:"จัดการร้านค้า",      section:"ร้านค้า" },
   { id:"blacklist",        icon:"⛔", label:"รายการ Blacklist" },
   { id:"upgrade-tier3",    icon:"🥇", label:"เลื่อนขั้นที่ 3",    section:"คำร้อง" },
   { id:"upgrade-requests", icon:"📋", label:"คำร้องขอเลื่อนขั้น" },
-  { id:"reports",          icon:"🚩", label:"คำร้องรายงาน" },
-  { id:"claims",           icon:"⚖️", label:"คำร้องขอเคลม" },
+  { id:"claims",           icon:"⚖️", label:"คำร้องเคลม" },
+  // ลบ reports ออกแล้ว
 ];
 
 function Sidebar({ active, onNavigate }) {
@@ -483,170 +444,156 @@ function Sidebar({ active, onNavigate }) {
   );
 }
 
-// ============================================================
-// DASHBOARD
-// ============================================================
+// ── Dashboard — ใช้ getClaims แทน getReports ─────────────────
 function DashboardPage() {
-  const [stats, setStats] = useState(null);
-  const [recentReports, setRecentReports] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [stats, setStats]         = useState(null);
+  const [recentClaims, setRecentClaims] = useState([]);
+  const [loading, setLoading]     = useState(true);
 
   useEffect(() => {
     Promise.all([
       adminApi.getDashboard().catch(() => null),
-      adminApi.getReports({ status: "pending", per_page: 5 }).catch(() => ({ data: [] })),
-    ]).then(([dashData, reportsData]) => {
+      adminApi.getClaims({ status:"pending", per_page:5 }).catch(() => ({ data:[] })),
+    ]).then(([dashData, claimsData]) => {
       setStats(dashData);
-      setRecentReports(reportsData?.data ?? []);
+      setRecentClaims(claimsData?.data ?? []);
       setLoading(false);
     });
   }, []);
 
   const s = stats ?? {};
-
   return (
     <div>
       <div className="page-title">📊 ภาพรวมระบบ</div>
       <div className="page-sub">ข้อมูลสถานะรวมของระบบ myOrder</div>
       <div className="stat-grid">
         {[
-          ["ร้านค้าทั้งหมด", s.total_shops ?? "—",   "var(--accent)"],
-          ["Blacklist",       s.blacklisted  ?? "—",   "var(--red)"],
-          ["รอเลื่อนขั้น",   s.pending_upgrades ?? "—","var(--yellow)"],
-          ["คำร้องเคลม",     s.pending_claims ?? "—",  "var(--blue)"],
+          ["ร้านค้าทั้งหมด", s.total_shops      ?? "—", "var(--accent)"],
+          ["Blacklist",      s.blacklisted       ?? "—", "var(--red)"],
+          ["รอเลื่อนขั้น",  s.pending_upgrades  ?? "—", "var(--yellow)"],
+          ["คำร้องเคลม",    s.pending_claims    ?? "—", "var(--blue)"],
         ].map(([label, val, color]) => (
           <div key={label} className="stat-card">
-            <div className="stat-val" style={{ color }}>{loading ? "…" : val}</div>
+            <div className="stat-val" style={{color}}>{loading?"…":val}</div>
             <div className="stat-label">{label}</div>
           </div>
         ))}
       </div>
       <div className="card">
-        <div className="card-title">คำร้องรายงานล่าสุดที่รอดำเนินการ</div>
+        <div className="card-title">คำร้องเคลมล่าสุดที่รอดำเนินการ</div>
         <div className="card-sub">คำร้องที่ยังไม่ได้จัดการ</div>
-        {loading ? <div style={{color:"var(--text3)",fontSize:13}}>กำลังโหลด...</div> :
-         recentReports.length === 0 ? <div style={{color:"var(--text3)",fontSize:13}}>ไม่มีคำร้องที่รอดำเนินการ</div> :
-         recentReports.map(r => (
-          <div key={r.id} style={{display:"flex",justifyContent:"space-between",padding:"10px 0",borderBottom:"1px solid var(--border)",alignItems:"center"}}>
-            <div>
-              <div style={{fontWeight:600}}>{r.shop?.name ?? r.reported_shop_ref_id}</div>
-              <div style={{fontSize:12,color:"var(--text3)"}}>{r.fraud_type?.name ?? r.reason} · {r.created_at?.substring(0,10)}</div>
-            </div>
-            <span className="badge badge-yellow">⏳ รอดำเนินการ</span>
-          </div>
-        ))}
+        {loading
+          ? <div style={{color:"var(--text3)",fontSize:13}}>กำลังโหลด...</div>
+          : recentClaims.length===0
+            ? <div style={{color:"var(--text3)",fontSize:13}}>ไม่มีคำร้องที่รอดำเนินการ</div>
+            : recentClaims.map(c => (
+              <div key={c.id} style={{display:"flex",justifyContent:"space-between",padding:"10px 0",borderBottom:"1px solid var(--border)",alignItems:"center"}}>
+                <div>
+                  <div style={{fontWeight:600}}>{c.shop?.name ?? c.shop_ref_id}</div>
+                  {/* reason แทน fraud_type (claim ใช้ reason) */}
+                  <div style={{fontSize:12,color:"var(--text3)"}}>{c.fraud_type?.name ?? c.reason} · {c.created_at?.substring(0,10)}</div>
+                </div>
+                <span className="badge badge-yellow">⏳ รอดำเนินการ</span>
+              </div>
+          ))}
       </div>
     </div>
   );
 }
 
-// ============================================================
-// UC6 + UC3 + UC4 + UC5 + UC7 — จัดการร้านค้า
-// ============================================================
+// ── UC6 + UC3 + UC4 + UC5 + UC7 ─────────────────────────────
 function ShopsPage({ notify }) {
-  const [shops, setShops]       = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [query, setQuery]       = useState("");
-  const [page, setPage]         = useState(1);
+  const [shops, setShops]         = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [query, setQuery]         = useState("");
+  const [page, setPage]           = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-
   const [selectedShop, setSelectedShop]           = useState(null);
   const [showAddModal, setShowAddModal]            = useState(false);
   const [showEditModal, setShowEditModal]          = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showBlacklistModal, setShowBlacklistModal] = useState(false);
   const [confirmShop, setConfirmShop]             = useState(null);
-
-  const [editForm, setEditForm]   = useState({});
+  const [editForm, setEditForm]     = useState({});
   const [editErrors, setEditErrors] = useState({});
-  const [addForm, setAddForm]     = useState({ name:"", url:"", description:"", owner_account_id:"" });
-  const [addErrors, setAddErrors] = useState({});
-  const [blacklistReason, setBlacklistReason]   = useState("");
-  const [blacklistError, setBlacklistError]     = useState("");
+  const [addForm, setAddForm]       = useState({ name:"", url:"", owner_account_id:"" });
+  const [addErrors, setAddErrors]   = useState({});
+  const [blacklistReason, setBlacklistReason] = useState("");
+  const [blacklistError, setBlacklistError]   = useState("");
+  const [deleteReason, setDeleteReason]   = useState("");
+  const [deleteError, setDeleteError]     = useState("");
   const [saving, setSaving] = useState(false);
 
   const loadShops = (q = query, p = page) => {
     setLoading(true);
-    adminApi.getShops({ q, page: p, per_page: ITEMS_PER_PAGE })
-      .then(data => {
-        setShops(data.data ?? []);
-        setTotalPages(data.last_page ?? 1);
-        setLoading(false);
-      })
+    adminApi.getShops({ q, page:p, per_page:ITEMS_PER_PAGE })
+      .then(data => { setShops(data.data??[]); setTotalPages(data.last_page??1); setLoading(false); })
       .catch(() => setLoading(false));
   };
-
   useEffect(() => { loadShops(); }, []);
-
-  const handleSearch = () => { setPage(1); loadShops(query, 1); };
 
   const openManage = (shop) => {
     setSelectedShop(shop);
-    setEditForm({ name: shop.name, url: shop.url, description: shop.description ?? "" });
+    setEditForm({ name:shop.name, url:shop.url??"" });
     setEditErrors({});
   };
 
   const handleSaveEdit = async () => {
     const errors = {};
-    const ne = validateText(editForm.name);  if (ne) errors.name = ne;
-    const le = validateUrl(editForm.url);    if (le) errors.url  = le;
+    const ne = validateText(editForm.name); if (ne) errors.name = ne;
+    const le = validateUrl(editForm.url);   if (le) errors.url  = le;
     if (Object.keys(errors).length) { setEditErrors(errors); return; }
     setSaving(true);
     try {
       const updated = await adminApi.updateShop(selectedShop.ref_id, editForm);
-      setShops(prev => prev.map(s => s.ref_id === selectedShop.ref_id ? { ...s, ...updated } : s));
-      setSelectedShop(s => ({ ...s, ...updated }));
+      setShops(prev => prev.map(s => s.ref_id===selectedShop.ref_id ? {...s,...updated} : s));
+      setSelectedShop(s => ({...s,...updated}));
       setShowEditModal(false);
-      notify("แก้ไขข้อมูลร้านค้าเรียบร้อย", "success");
-    } catch (e) {
-      notify("บันทึกไม่สำเร็จ: " + e.message, "error");
-    } finally { setSaving(false); }
+      notify("แก้ไขข้อมูลร้านค้าเรียบร้อย","success");
+    } catch(e) { notify("บันทึกไม่สำเร็จ: "+e.message,"error"); }
+    finally { setSaving(false); }
   };
 
   const handleDelete = async (shop) => {
+    if (!deleteReason.trim()) { setDeleteError("กรุณาระบุเหตุผลการลบ"); return; }
     setSaving(true);
     try {
-      await adminApi.deleteShop(shop.ref_id);
-      setShops(prev => prev.filter(s => s.ref_id !== shop.ref_id));
-      setSelectedShop(null); setShowDeleteConfirm(false);
-      notify(`ลบร้านค้า "${shop.name}" เรียบร้อย`, "success");
-    } catch (e) {
-      notify("ลบไม่สำเร็จ: " + e.message, "error");
-    } finally { setSaving(false); }
+      await adminApi.deleteShop(shop.ref_id, deleteReason);
+      setShops(prev => prev.filter(s => s.ref_id!==shop.ref_id));
+      setSelectedShop(null); setShowDeleteConfirm(false); setDeleteReason("");
+      notify(`ลบร้านค้า "${shop.name}" เรียบร้อย`,"success");
+    } catch(e) { notify("ลบไม่สำเร็จ: "+e.message,"error"); }
+    finally { setSaving(false); }
   };
 
   const handleBlacklist = async () => {
     if (!blacklistReason.trim()) { setBlacklistError("กรุณาระบุเหตุผล"); return; }
     setSaving(true);
     try {
-      await adminApi.blacklistShop(selectedShop.ref_id, blacklistReason);
-      setShops(prev => prev.map(s => s.ref_id === selectedShop.ref_id ? { ...s, is_blacklist: true } : s));
+      // claim_request_id = null (ไม่ระบุจาก modal นี้)
+      await adminApi.blacklistShop(selectedShop.ref_id, blacklistReason, null);
+      setShops(prev => prev.map(s => s.ref_id===selectedShop.ref_id ? {...s,is_blacklist:true} : s));
       setShowBlacklistModal(false); setSelectedShop(null);
-      notify(`เพิ่ม "${selectedShop.name}" ใน Blacklist แล้ว`, "success");
-    } catch (e) {
-      notify("Blacklist ไม่สำเร็จ: " + e.message, "error");
-    } finally { setSaving(false); }
+      notify(`เพิ่ม "${selectedShop.name}" ใน Blacklist แล้ว`,"success");
+    } catch(e) { notify("Blacklist ไม่สำเร็จ: "+e.message,"error"); }
+    finally { setSaving(false); }
   };
 
   const handleAddShop = async () => {
     const errors = {};
-    const ne = validateText(addForm.name);       if (ne) errors.name = ne;
-    const le = validateUrl(addForm.url);         if (le) errors.url  = le;
-    const oe = validateUserId(addForm.owner_account_id); if (oe) errors.owner_account_id = oe;
+    const ne = validateText(addForm.name);              if (ne) errors.name = ne;
+    const le = validateUrl(addForm.url);                if (le) errors.url  = le;
+    const oe = validateUserId(addForm.owner_account_id);if (oe) errors.owner_account_id = oe;
     if (Object.keys(errors).length) { setAddErrors(errors); return; }
     setSaving(true);
     try {
       const newShop = await adminApi.createShop(addForm);
-      setShops(prev => [newShop, ...prev]);
-      setShowAddModal(false);
-      setAddForm({ name:"", url:"", description:"", owner_account_id:"" });
-      notify("เพิ่มร้านค้าใหม่เรียบร้อย", "success");
-    } catch (e) {
-      notify("เพิ่มไม่สำเร็จ: " + e.message, "error");
-    } finally { setSaving(false); }
+      setShops(prev => [newShop,...prev]);
+      setShowAddModal(false); setAddForm({ name:"",url:"",owner_account_id:"" });
+      notify("เพิ่มร้านค้าใหม่เรียบร้อย","success");
+    } catch(e) { notify("เพิ่มไม่สำเร็จ: "+e.message,"error"); }
+    finally { setSaving(false); }
   };
-
-  const tierOf = (s) => s.tier ?? (s.shop_status === "TIER3" ? 3 : s.shop_status === "TIER2" ? 2 : 1);
 
   return (
     <div>
@@ -655,19 +602,19 @@ function ShopsPage({ notify }) {
         <button className="btn btn-primary" onClick={()=>setShowAddModal(true)}>＋ เพิ่มร้านค้า</button>
       </div>
       <div className="search-bar">
-        <input className="search-input" placeholder="ค้นหาชื่อร้าน, Account ID..." value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleSearch()} />
-        <button className="btn btn-outline btn-sm" onClick={handleSearch}>🔍 ค้นหา</button>
+        <input className="search-input" placeholder="ค้นหาชื่อร้าน..." value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==="Enter"&&loadShops(query,1)} />
+        <button className="btn btn-outline btn-sm" onClick={()=>loadShops(query,1)}>🔍 ค้นหา</button>
       </div>
       <div className="card" style={{padding:0,overflow:"hidden"}}>
         <table className="table">
           <thead><tr><th>ร้านค้า</th><th>ระดับ</th><th>สถานะ</th><th>เจ้าของ</th><th>จัดการ</th></tr></thead>
           <tbody>
-            {loading ? <SkeletonRows cols={5} /> : shops.length === 0
+            {loading ? <SkeletonRows cols={5} /> : shops.length===0
               ? <tr><td colSpan={5} style={{textAlign:"center",padding:"24px",color:"var(--text3)"}}>ไม่พบร้านค้า</td></tr>
               : shops.map(s => (
               <tr key={s.ref_id}>
                 <td><div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <span style={{fontSize:20}}>{s.img_emoji ?? "🏪"}</span>
+                  <span style={{fontSize:20}}>🏪</span>
                   <div><div style={{fontWeight:600}}>{s.name}</div><div style={{fontSize:11,color:"var(--text3)"}}>{s.ref_id}</div></div>
                 </div></td>
                 <td><TierBadge tier={tierOf(s)} /></td>
@@ -677,7 +624,7 @@ function ShopsPage({ notify }) {
                     ? <span className="badge badge-green">✓ เปิด</span>
                     : <span className="badge badge-gray">🔒 ปิด</span>}
                 </td>
-                <td style={{fontSize:12,color:"var(--text3)"}}>{s.owner_account_id ?? "—"}</td>
+                <td style={{fontSize:12,color:"var(--text3)"}}>{s.owner_account_id??"—"}</td>
                 <td><button className="btn btn-outline btn-xs" onClick={()=>openManage(s)}>จัดการ</button></td>
               </tr>
             ))}
@@ -686,11 +633,10 @@ function ShopsPage({ notify }) {
       </div>
       <Pagination currentPage={page} totalPages={totalPages} onChange={p=>{setPage(p);loadShops(query,p);}} />
 
-      {/* Modal จัดการ */}
       {selectedShop && (
         <Modal title={`จัดการ: ${selectedShop.name}`} onClose={()=>setSelectedShop(null)} wide>
           <div style={{display:"flex",gap:14,alignItems:"center",marginBottom:20,padding:"0 0 16px",borderBottom:"1px solid var(--border)"}}>
-            <span style={{fontSize:36}}>{selectedShop.img_emoji ?? "🏪"}</span>
+            <span style={{fontSize:36}}>🏪</span>
             <div>
               <div style={{fontFamily:"var(--display)",fontSize:16,fontWeight:600}}>{selectedShop.name}</div>
               <div style={{display:"flex",gap:6,marginTop:4}}><TierBadge tier={tierOf(selectedShop)} /></div>
@@ -701,26 +647,24 @@ function ShopsPage({ notify }) {
             <button className="btn btn-warn"
               onClick={()=>{setBlacklistReason("");setBlacklistError("");setShowBlacklistModal(true);}}
               disabled={!!selectedShop.is_blacklist}>
-              {selectedShop.is_blacklist ? "⛔ Blacklist แล้ว" : "⛔ เพิ่ม Blacklist"}
+              {selectedShop.is_blacklist?"⛔ Blacklist แล้ว":"⛔ เพิ่ม Blacklist"}
             </button>
-            <button className="btn btn-danger" onClick={()=>{setConfirmShop(selectedShop);setShowDeleteConfirm(true);}}>🗑️ ลบร้านค้า</button>
+            <button className="btn btn-danger" onClick={()=>{setConfirmShop(selectedShop);setDeleteReason("");setDeleteError("");setShowDeleteConfirm(true);}}>🗑️ ลบร้านค้า</button>
           </div>
           <div className="detail-row"><div className="detail-label">🔗 ลิงก์</div><div className="detail-value" style={{wordBreak:"break-all"}}>{selectedShop.url||"—"}</div></div>
-          <div className="detail-row"><div className="detail-label">📝 รายละเอียด</div><div className="detail-value">{selectedShop.description||"—"}</div></div>
           <div className="detail-row"><div className="detail-label">👤 เจ้าของ</div><div className="detail-value">{selectedShop.owner_account_id||"—"}</div></div>
           <div className="detail-row"><div className="detail-label">📅 สร้างเมื่อ</div><div className="detail-value">{selectedShop.created_at?.substring(0,10)||"—"}</div></div>
           <div className="detail-row"><div className="detail-label">📊 Upgrade fails</div>
             <div className="detail-value">
-              <span style={{color: selectedShop.failed_upgrade_count >= 3 ? "var(--red)" : "var(--text)", fontWeight: selectedShop.failed_upgrade_count >= 3 ? 700 : 400}}>
-                {selectedShop.failed_upgrade_count ?? 0} / 3 ครั้ง
+              <span style={{color:selectedShop.failed_upgrade_count>=3?"var(--red)":"var(--text)",fontWeight:selectedShop.failed_upgrade_count>=3?700:400}}>
+                {selectedShop.failed_upgrade_count??0} / 3 ครั้ง
               </span>
-              {selectedShop.failed_upgrade_count >= 3 && <span style={{marginLeft:8,fontSize:11,color:"var(--text3)"}}>(cooldown 90 วัน)</span>}
+              {selectedShop.failed_upgrade_count>=3 && <span style={{marginLeft:8,fontSize:11,color:"var(--text3)"}}>(cooldown 30 วัน)</span>}
             </div>
           </div>
         </Modal>
       )}
 
-      {/* Modal Blacklist */}
       {showBlacklistModal && selectedShop && (
         <Modal title="⛔ ยืนยันการแบนร้านค้า" onClose={()=>setShowBlacklistModal(false)}
           footer={<><button className="btn btn-ghost btn-sm" onClick={()=>setShowBlacklistModal(false)}>ยกเลิก</button><button className="btn btn-warn btn-sm" onClick={handleBlacklist} disabled={saving}>ยืนยันการแบน</button></>}>
@@ -734,42 +678,40 @@ function ShopsPage({ notify }) {
         </Modal>
       )}
 
-      {/* Modal Edit */}
       {showEditModal && selectedShop && (
         <Modal title="✏️ แก้ไขข้อมูลร้านค้า" onClose={()=>{setShowEditModal(false);setEditErrors({});}}
           footer={<><button className="btn btn-ghost btn-sm" onClick={()=>setShowEditModal(false)}>ยกเลิก</button><button className="btn btn-primary btn-sm" onClick={handleSaveEdit} disabled={saving}>บันทึก</button></>}>
           <div className="form-group"><label className="form-label">ชื่อร้านค้า *</label><input className={`input ${editErrors.name?"error":""}`} value={editForm.name} onChange={e=>{setEditForm(p=>({...p,name:e.target.value}));setEditErrors(p=>({...p,name:null}));}} />{editErrors.name&&<div className="form-error">{editErrors.name}</div>}</div>
           <div className="form-group"><label className="form-label">ลิงก์ติดต่อ *</label><input className={`input ${editErrors.url?"error":""}`} value={editForm.url} onChange={e=>{setEditForm(p=>({...p,url:e.target.value}));setEditErrors(p=>({...p,url:null}));}} />{editErrors.url&&<div className="form-error">{editErrors.url}</div>}</div>
-          <div className="form-group"><label className="form-label">รายละเอียด</label><textarea className="input textarea" value={editForm.description} onChange={e=>setEditForm(p=>({...p,description:e.target.value}))} /></div>
         </Modal>
       )}
 
-      {/* Modal Delete */}
       {showDeleteConfirm && confirmShop && (
         <Modal title="🗑️ ยืนยันการลบ" onClose={()=>setShowDeleteConfirm(false)}
           footer={<><button className="btn btn-ghost btn-sm" onClick={()=>setShowDeleteConfirm(false)}>ยกเลิก</button><button className="btn btn-danger btn-sm" onClick={()=>handleDelete(confirmShop)} disabled={saving}>ยืนยันลบ</button></>}>
           <div className="alert alert-warn" style={{marginBottom:16}}>⚠️ ร้านค้าจะไม่ปรากฏในระบบอีกต่อไป</div>
-          <p style={{fontSize:14}}>ลบ <strong>"{confirmShop.name}"</strong>?</p>
+          <p style={{fontSize:14,marginBottom:12}}>ลบ <strong>"{confirmShop.name}"</strong>?</p>
+          <div className="form-group">
+            <label className="form-label">เหตุผลการลบ *</label>
+            <textarea className={`input textarea ${deleteError?"error":""}`} placeholder="เช่น ร้านค้ายกเลิกกิจการ..." value={deleteReason} onChange={e=>{setDeleteReason(e.target.value);setDeleteError("");}} rows={2} />
+            {deleteError && <div className="form-error">{deleteError}</div>}
+          </div>
         </Modal>
       )}
 
-      {/* Modal Add */}
       {showAddModal && (
         <Modal title="＋ เพิ่มร้านค้าใหม่" onClose={()=>{setShowAddModal(false);setAddErrors({});}} wide
           footer={<><button className="btn btn-ghost btn-sm" onClick={()=>setShowAddModal(false)}>ยกเลิก</button><button className="btn btn-primary btn-sm" onClick={handleAddShop} disabled={saving}>เพิ่มร้านค้า</button></>}>
           <div className="form-group"><label className="form-label">ชื่อร้านค้า *</label><input className={`input ${addErrors.name?"error":""}`} value={addForm.name} onChange={e=>{setAddForm(p=>({...p,name:e.target.value}));setAddErrors(p=>({...p,name:null}));}} />{addErrors.name&&<div className="form-error">{addErrors.name}</div>}</div>
           <div className="form-group"><label className="form-label">Account ID เจ้าของ *</label><input className={`input ${addErrors.owner_account_id?"error":""}`} placeholder="ULID ของ account" value={addForm.owner_account_id} onChange={e=>{setAddForm(p=>({...p,owner_account_id:e.target.value}));setAddErrors(p=>({...p,owner_account_id:null}));}} />{addErrors.owner_account_id&&<div className="form-error">{addErrors.owner_account_id}</div>}</div>
           <div className="form-group"><label className="form-label">ลิงก์ติดต่อ *</label><input className={`input ${addErrors.url?"error":""}`} placeholder="https://line.me/..." value={addForm.url} onChange={e=>{setAddForm(p=>({...p,url:e.target.value}));setAddErrors(p=>({...p,url:null}));}} />{addErrors.url&&<div className="form-error">{addErrors.url}</div>}</div>
-          <div className="form-group"><label className="form-label">รายละเอียด</label><textarea className="input textarea" value={addForm.description} onChange={e=>setAddForm(p=>({...p,description:e.target.value}))} /></div>
         </Modal>
       )}
     </div>
   );
 }
 
-// ============================================================
-// UC7 — Blacklist
-// ============================================================
+// ── UC7 Blacklist ─────────────────────────────────────────────
 function BlacklistPage() {
   const [shops, setShops]     = useState([]);
   const [loading, setLoading] = useState(true);
@@ -778,10 +720,10 @@ function BlacklistPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [selected, setSelected] = useState(null);
 
-  const load = (q = query, p = page) => {
+  const load = (q=query, p=page) => {
     setLoading(true);
-    adminApi.getShops({ q, blacklisted: 1, page: p, per_page: ITEMS_PER_PAGE })
-      .then(data => { setShops(data.data ?? []); setTotalPages(data.last_page ?? 1); setLoading(false); })
+    adminApi.getShops({ q, blacklisted:1, page:p, per_page:ITEMS_PER_PAGE })
+      .then(data => { setShops(data.data??[]); setTotalPages(data.last_page??1); setLoading(false); })
       .catch(() => setLoading(false));
   };
   useEffect(() => { load(); }, []);
@@ -802,9 +744,9 @@ function BlacklistPage() {
               ? <tr><td colSpan={4} style={{textAlign:"center",padding:"24px",color:"var(--text3)"}}>ไม่พบร้านค้าใน Blacklist</td></tr>
               : shops.map(s => (
               <tr key={s.ref_id}>
-                <td><div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:18}}>{s.img_emoji ?? "🏪"}</span><div><div style={{fontWeight:600}}>{s.name}</div><span className="badge badge-red" style={{fontSize:10}}>⛔ Blacklist</span></div></div></td>
-                <td><span className="badge badge-red">ระงับ</span></td>
-                <td style={{fontSize:12,color:"var(--text3)"}}>{s.owner_account_id ?? "—"}</td>
+                <td><div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:18}}>🏪</span><div><div style={{fontWeight:600}}>{s.name}</div><div style={{fontSize:11,color:"var(--text3)"}}>{s.ref_id}</div></div></div></td>
+                <td><span className="badge badge-red">⛔ ระงับ</span></td>
+                <td style={{fontSize:12,color:"var(--text3)"}}>{s.owner_account_id??"—"}</td>
                 <td><button className="btn btn-outline btn-xs" onClick={()=>setSelected(s)}>ดูรายละเอียด</button></td>
               </tr>
             ))}
@@ -818,16 +760,13 @@ function BlacklistPage() {
           <div className="detail-row"><div className="detail-label">ชื่อร้าน</div><div className="detail-value">{selected.name}</div></div>
           <div className="detail-row"><div className="detail-label">ref_id</div><div className="detail-value">{selected.ref_id}</div></div>
           <div className="detail-row"><div className="detail-label">เจ้าของ</div><div className="detail-value">{selected.owner_account_id}</div></div>
-          <div className="detail-row"><div className="detail-label">รายละเอียด</div><div className="detail-value">{selected.description}</div></div>
         </Modal>
       )}
     </div>
   );
 }
 
-// ============================================================
-// UC9 — เลื่อนขั้น 3
-// ============================================================
+// ── UC9 เลื่อนขั้น 3 ─────────────────────────────────────────
 function UpgradeTier3Page({ notify }) {
   const [shops, setShops]     = useState([]);
   const [loading, setLoading] = useState(true);
@@ -838,10 +777,10 @@ function UpgradeTier3Page({ notify }) {
   const [confirmModal, setConfirmModal] = useState(false);
   const [saving, setSaving]   = useState(false);
 
-  const load = (q = query, p = page) => {
+  const load = (q=query, p=page) => {
     setLoading(true);
-    adminApi.getShops({ q, tier: "tier2", page: p, per_page: ITEMS_PER_PAGE })
-      .then(data => { setShops(data.data ?? []); setTotalPages(data.last_page ?? 1); setLoading(false); })
+    adminApi.getShops({ q, tier:"TIER_2", page:p, per_page:ITEMS_PER_PAGE })
+      .then(data => { setShops(data.data??[]); setTotalPages(data.last_page??1); setLoading(false); })
       .catch(() => setLoading(false));
   };
   useEffect(() => { load(); }, []);
@@ -850,12 +789,11 @@ function UpgradeTier3Page({ notify }) {
     setSaving(true);
     try {
       await adminApi.promoteTier3(selectedShop.ref_id);
-      setShops(prev => prev.filter(s => s.ref_id !== selectedShop.ref_id));
+      setShops(prev => prev.filter(s => s.ref_id!==selectedShop.ref_id));
       setSelectedShop(null); setConfirmModal(false);
-      notify(`เลื่อน "${selectedShop.name}" เป็น ขั้น 3 เรียบร้อย`, "success");
-    } catch (e) {
-      notify("ไม่สำเร็จ: " + e.message, "error");
-    } finally { setSaving(false); }
+      notify(`เลื่อน "${selectedShop.name}" เป็น ขั้น 3 เรียบร้อย`,"success");
+    } catch(e) { notify("ไม่สำเร็จ: "+e.message,"error"); }
+    finally { setSaving(false); }
   };
 
   return (
@@ -874,9 +812,9 @@ function UpgradeTier3Page({ notify }) {
               ? <tr><td colSpan={4} style={{textAlign:"center",padding:"24px",color:"var(--text3)"}}>ไม่มีร้านค้าระดับ 2 รอเลื่อนขั้น</td></tr>
               : shops.map(s => (
               <tr key={s.ref_id}>
-                <td><div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:18}}>{s.img_emoji ?? "🏪"}</span><div style={{fontWeight:600}}>{s.name}</div></div></td>
+                <td><div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:18}}>🏪</span><div style={{fontWeight:600}}>{s.name}</div></div></td>
                 <td><TierBadge tier={2} /></td>
-                <td style={{fontSize:12,color:"var(--text3)"}}>{s.owner_account_id ?? "—"}</td>
+                <td style={{fontSize:12,color:"var(--text3)"}}>{s.owner_account_id??"—"}</td>
                 <td><button className="btn btn-outline btn-xs" onClick={()=>{setSelectedShop(s);setConfirmModal(false);}}>จัดการ</button></td>
               </tr>
             ))}
@@ -884,7 +822,6 @@ function UpgradeTier3Page({ notify }) {
         </table>
       </div>
       <Pagination currentPage={page} totalPages={totalPages} onChange={p=>{setPage(p);load(query,p);}} />
-
       {selectedShop && !confirmModal && (
         <Modal title={`เลื่อนขั้น: ${selectedShop.name}`} onClose={()=>setSelectedShop(null)}>
           <div className="alert alert-info" style={{marginBottom:16}}>💡 ยืนยันว่า myOrder ทดลองสั่งสินค้าแล้วและไม่พบการโกง</div>
@@ -905,9 +842,7 @@ function UpgradeTier3Page({ notify }) {
   );
 }
 
-// ============================================================
-// UC10 — คำร้องขอเลื่อนขั้น
-// ============================================================
+// ── UC10 คำร้องขอเลื่อนขั้น ──────────────────────────────────
 function UpgradeRequestsPage({ notify }) {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading]   = useState(true);
@@ -917,30 +852,27 @@ function UpgradeRequestsPage({ notify }) {
   const [selected, setSelected] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
   const [showRejectModal, setShowRejectModal] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [viewerDocs, setViewerDocs]   = useState(null);
+  const [saving, setSaving]     = useState(false);
+  const [viewerDocs, setViewerDocs]     = useState(null);
   const [viewerInitIdx, setViewerInitIdx] = useState(0);
 
-  const load = (status = statusFilter, p = page) => {
+  const load = (status=statusFilter, p=page) => {
     setLoading(true);
-    adminApi.getUpgradeRequests({ status, page: p, per_page: ITEMS_PER_PAGE })
-      .then(data => { setRequests(data.data ?? []); setTotalPages(data.last_page ?? 1); setLoading(false); })
+    adminApi.getUpgradeRequests({ status, page:p, per_page:ITEMS_PER_PAGE })
+      .then(data => { setRequests(data.data??[]); setTotalPages(data.last_page??1); setLoading(false); })
       .catch(() => setLoading(false));
   };
   useEffect(() => { load(); }, []);
-
-  const openViewer = (docs, idx) => { setViewerDocs(docs); setViewerInitIdx(idx); };
 
   const handleApprove = async (req) => {
     setSaving(true);
     try {
       await adminApi.approveUpgrade(req.id);
-      setRequests(prev => prev.filter(r => r.id !== req.id));
+      setRequests(prev => prev.filter(r => r.id!==req.id));
       setSelected(null);
-      notify(`อนุมัติคำขอของ "${req.shop?.name}" แล้ว`, "success");
-    } catch (e) {
-      notify("ไม่สำเร็จ: " + e.message, "error");
-    } finally { setSaving(false); }
+      notify(`อนุมัติคำขอของ "${req.shop?.name}" แล้ว`,"success");
+    } catch(e) { notify("ไม่สำเร็จ: "+e.message,"error"); }
+    finally { setSaving(false); }
   };
 
   const handleReject = async (req) => {
@@ -948,12 +880,11 @@ function UpgradeRequestsPage({ notify }) {
     setSaving(true);
     try {
       await adminApi.rejectUpgrade(req.id, rejectReason);
-      setRequests(prev => prev.filter(r => r.id !== req.id));
+      setRequests(prev => prev.filter(r => r.id!==req.id));
       setSelected(null); setShowRejectModal(false); setRejectReason("");
-      notify(`ปฏิเสธคำขอของ "${req.shop?.name}"`, "error");
-    } catch (e) {
-      notify("ไม่สำเร็จ: " + e.message, "error");
-    } finally { setSaving(false); }
+      notify(`ปฏิเสธคำขอของ "${req.shop?.name}"`,"error");
+    } catch(e) { notify("ไม่สำเร็จ: "+e.message,"error"); }
+    finally { setSaving(false); }
   };
 
   const statusBadge = (s) => {
@@ -983,7 +914,7 @@ function UpgradeRequestsPage({ notify }) {
               ? <tr><td colSpan={5} style={{textAlign:"center",padding:"24px",color:"var(--text3)"}}>ไม่มีคำร้อง</td></tr>
               : requests.map(req => (
               <tr key={req.id}>
-                <td style={{fontWeight:600}}>{req.shop?.name ?? req.shop_ref_id}</td>
+                <td style={{fontWeight:600}}>{req.shop?.name??req.shop_ref_id}</td>
                 <td><span className="badge badge-gray">{req.shop?.is_company?"🏢 นิติบุคคล":"👤 บุคคลธรรมดา"}</span></td>
                 <td style={{fontSize:12,color:"var(--text3)"}}>{req.created_at?.substring(0,10)}</td>
                 <td>{statusBadge(req.status)}</td>
@@ -996,19 +927,16 @@ function UpgradeRequestsPage({ notify }) {
       <Pagination currentPage={page} totalPages={totalPages} onChange={p=>{setPage(p);load(statusFilter,p);}} />
 
       {selected && (
-        <Modal title={`คำขอ: ${selected.shop?.name ?? selected.shop_ref_id}`} onClose={()=>setSelected(null)} wide>
-          <div style={{marginBottom:16}}>
-            <div className="detail-row"><div className="detail-label">ร้านค้า</div><div className="detail-value">{selected.shop?.name}</div></div>
-            <div className="detail-row"><div className="detail-label">ประเภทเจ้าของ</div><div className="detail-value">{selected.shop?.is_company?"🏢 นิติบุคคล":"👤 บุคคลธรรมดา"}</div></div>
-            <div className="detail-row"><div className="detail-label">วันที่ยื่น</div><div className="detail-value">{selected.created_at?.substring(0,10)}</div></div>
-            <div className="detail-row"><div className="detail-label">สถานะ</div><div className="detail-value">{statusBadge(selected.status)}</div></div>
-            {selected.admin_remark && <div className="detail-row"><div className="detail-label">เหตุผลไม่ผ่าน</div><div className="detail-value" style={{color:"var(--red)"}}>{selected.admin_remark}</div></div>}
-          </div>
-          {/* เอกสาร */}
-          {(selected.attachments?.length > 0) && (
-            <div style={{marginBottom:20}}>
+        <Modal title={`คำขอ: ${selected.shop?.name??selected.shop_ref_id}`} onClose={()=>setSelected(null)} wide>
+          <div className="detail-row"><div className="detail-label">ร้านค้า</div><div className="detail-value">{selected.shop?.name}</div></div>
+          <div className="detail-row"><div className="detail-label">ประเภทเจ้าของ</div><div className="detail-value">{selected.shop?.is_company?"🏢 นิติบุคคล":"👤 บุคคลธรรมดา"}</div></div>
+          <div className="detail-row"><div className="detail-label">วันที่ยื่น</div><div className="detail-value">{selected.created_at?.substring(0,10)}</div></div>
+          <div className="detail-row"><div className="detail-label">สถานะ</div><div className="detail-value">{statusBadge(selected.status)}</div></div>
+          {selected.admin_remark && <div className="detail-row"><div className="detail-label">เหตุผลไม่ผ่าน</div><div className="detail-value" style={{color:"var(--red)"}}>{selected.admin_remark}</div></div>}
+          {selected.attachments?.length > 0 && (
+            <div style={{marginBottom:20,marginTop:12}}>
               <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:10}}>เอกสารที่ส่งมา</div>
-              <DocList docs={selected.attachments.map(makeDocFromAttachment)} onView={idx=>openViewer(selected.attachments.map(makeDocFromAttachment),idx)} />
+              <DocList docs={selected.attachments.map(makeDocFromAttachment)} onView={idx=>{ setViewerDocs(selected.attachments.map(makeDocFromAttachment)); setViewerInitIdx(idx); }} />
             </div>
           )}
           {selected.status==="pending" && (
@@ -1035,106 +963,7 @@ function UpgradeRequestsPage({ notify }) {
   );
 }
 
-// ============================================================
-// UC2 — คำร้องรายงาน
-// ============================================================
-function ReportsPage({ notify }) {
-  const [reports, setReports] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [page, setPage]       = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [statusFilter, setStatusFilter] = useState("pending");
-  const [selected, setSelected] = useState(null);
-  const [saving, setSaving]    = useState(false);
-  const [viewerDocs, setViewerDocs]   = useState(null);
-  const [viewerInitIdx, setViewerInitIdx] = useState(0);
-
-  const load = (status = statusFilter, p = page) => {
-    setLoading(true);
-    adminApi.getReports({ status, page: p, per_page: ITEMS_PER_PAGE })
-      .then(data => { setReports(data.data ?? []); setTotalPages(data.last_page ?? 1); setLoading(false); })
-      .catch(() => setLoading(false));
-  };
-  useEffect(() => { load(); }, []);
-
-  const handleResolve = async (req) => {
-    setSaving(true);
-    try {
-      await adminApi.resolveReport(req.id);
-      setReports(prev => prev.filter(r => r.id !== req.id));
-      setSelected(null);
-      notify(`ดำเนินการคำร้อง "${req.shop?.name}" เรียบร้อย`, "success");
-    } catch (e) {
-      notify("ไม่สำเร็จ: " + e.message, "error");
-    } finally { setSaving(false); }
-  };
-
-  const statusBadge = (s) => s==="pending"
-    ? <span className="badge badge-yellow">⏳ รอดำเนินการ</span>
-    : <span className="badge badge-green">✓ ดำเนินการแล้ว</span>;
-
-  return (
-    <div>
-      <div className="page-title">🚩 คำร้องรายงาน</div>
-      <div className="page-sub">UC2 — รายการร้านค้าที่ถูกรายงาน</div>
-      <div style={{display:"flex",gap:8,marginBottom:20}}>
-        {["pending","resolved"].map(s => (
-          <button key={s} className={`btn btn-sm ${statusFilter===s?"btn-primary":"btn-outline"}`}
-            onClick={()=>{setStatusFilter(s);setPage(1);load(s,1);}}>
-            {s==="pending"?"⏳ รอดำเนินการ":"✓ ดำเนินการแล้ว"}
-          </button>
-        ))}
-      </div>
-      <div className="card" style={{padding:0,overflow:"hidden"}}>
-        <table className="table">
-          <thead><tr><th>ร้านค้า</th><th>ประเภท</th><th>ผู้รายงาน</th><th>วันที่</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
-          <tbody>
-            {loading ? <SkeletonRows cols={6} /> : reports.length===0
-              ? <tr><td colSpan={6} style={{textAlign:"center",padding:"24px",color:"var(--text3)"}}>ไม่มีคำร้อง</td></tr>
-              : reports.map(r => (
-              <tr key={r.id}>
-                <td style={{fontWeight:600}}>{r.shop?.name ?? r.reported_shop_ref_id}</td>
-                <td><span className="badge badge-red" style={{fontSize:10}}>{r.fraud_type?.name ?? r.reason}</span></td>
-                <td style={{fontSize:12,color:"var(--text3)"}}>{r.reporter?.email ?? r.reporter_account_id}</td>
-                <td style={{fontSize:12,color:"var(--text3)"}}>{r.created_at?.substring(0,10)}</td>
-                <td>{statusBadge(r.status)}</td>
-                <td><button className="btn btn-outline btn-xs" onClick={()=>setSelected(r)}>จัดการ</button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <Pagination currentPage={page} totalPages={totalPages} onChange={p=>{setPage(p);load(statusFilter,p);}} />
-
-      {selected && (
-        <Modal title={`คำร้อง: ${selected.shop?.name ?? selected.reported_shop_ref_id}`} onClose={()=>setSelected(null)} wide>
-          <div className="detail-row"><div className="detail-label">ร้านค้า</div><div className="detail-value">{selected.shop?.name}</div></div>
-          <div className="detail-row"><div className="detail-label">ประเภท</div><div className="detail-value">{selected.fraud_type?.name}</div></div>
-          <div className="detail-row"><div className="detail-label">รายละเอียด</div><div className="detail-value">{selected.reason}</div></div>
-          <div className="detail-row"><div className="detail-label">ผู้รายงาน</div><div className="detail-value">{selected.reporter?.email ?? selected.reporter_account_id}</div></div>
-          <div className="detail-row"><div className="detail-label">วันที่</div><div className="detail-value">{selected.created_at?.substring(0,10)}</div></div>
-          <div className="detail-row"><div className="detail-label">สถานะ</div><div className="detail-value">{statusBadge(selected.status)}</div></div>
-          {(selected.attachments?.length > 0) && (
-            <div style={{marginTop:16,marginBottom:4}}>
-              <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:10}}>เอกสารแนบ</div>
-              <DocList docs={selected.attachments.map(makeDocFromAttachment)} onView={idx=>{ setViewerDocs(selected.attachments.map(makeDocFromAttachment)); setViewerInitIdx(idx); }} />
-            </div>
-          )}
-          {selected.status==="pending" && (
-            <div style={{display:"flex",justifyContent:"flex-end",marginTop:16}}>
-              <button className="btn btn-success btn-sm" onClick={()=>handleResolve(selected)} disabled={saving}>✓ ดำเนินการแล้ว</button>
-            </div>
-          )}
-        </Modal>
-      )}
-      {viewerDocs && <DocViewer docs={viewerDocs} initialIndex={viewerInitIdx} onClose={()=>setViewerDocs(null)} />}
-    </div>
-  );
-}
-
-// ============================================================
-// UC11 — คำร้องเคลม
-// ============================================================
+// ── UC11 คำร้องเคลม ──────────────────────────────────────────
 function ClaimsPage({ notify }) {
   const [claims, setClaims]   = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1143,27 +972,34 @@ function ClaimsPage({ notify }) {
   const [statusFilter, setStatusFilter] = useState("pending");
   const [selected, setSelected] = useState(null);
   const [saving, setSaving]    = useState(false);
-  const [viewerDocs, setViewerDocs]   = useState(null);
+  const [viewerDocs, setViewerDocs]     = useState(null);
   const [viewerInitIdx, setViewerInitIdx] = useState(0);
+  // modal ปิดเคลม
+  const [showResolveModal, setShowResolveModal] = useState(false);
+  const [resolveForm, setResolveForm] = useState({ resolution:"NOTED", refund_amount:"", admin_note:"" });
 
-  const load = (status = statusFilter, p = page) => {
+  const load = (status=statusFilter, p=page) => {
     setLoading(true);
-    adminApi.getClaims({ status, page: p, per_page: ITEMS_PER_PAGE })
-      .then(data => { setClaims(data.data ?? []); setTotalPages(data.last_page ?? 1); setLoading(false); })
+    adminApi.getClaims({ status, page:p, per_page:ITEMS_PER_PAGE })
+      .then(data => { setClaims(data.data??[]); setTotalPages(data.last_page??1); setLoading(false); })
       .catch(() => setLoading(false));
   };
   useEffect(() => { load(); }, []);
 
-  const handleResolve = async (clm) => {
+  const handleResolve = async () => {
     setSaving(true);
     try {
-      await adminApi.resolveClaim(clm.id);
-      setClaims(prev => prev.filter(c => c.id !== clm.id));
-      setSelected(null);
-      notify(`ปิดคำร้องเคลมของ "${clm.shop?.name}" เรียบร้อย`, "success");
-    } catch (e) {
-      notify("ไม่สำเร็จ: " + e.message, "error");
-    } finally { setSaving(false); }
+      await adminApi.resolveClaim(
+        selected.id,
+        resolveForm.resolution,
+        resolveForm.refund_amount ? parseFloat(resolveForm.refund_amount) : null,
+        resolveForm.admin_note,
+      );
+      setClaims(prev => prev.filter(c => c.id!==selected.id));
+      setSelected(null); setShowResolveModal(false);
+      notify(`ปิดคำร้องเคลม #${selected.id} เรียบร้อย`,"success");
+    } catch(e) { notify("ไม่สำเร็จ: "+e.message,"error"); }
+    finally { setSaving(false); }
   };
 
   const statusBadge = (s) => s==="pending"
@@ -1191,12 +1027,12 @@ function ClaimsPage({ notify }) {
               : claims.map(c => (
               <tr key={c.id}>
                 <td style={{fontSize:11,color:"var(--text3)"}}>{c.id}</td>
-                <td style={{fontWeight:600}}>{c.shop?.name ?? c.shop_ref_id}</td>
-                <td style={{fontSize:12,color:"var(--text3)"}}>{c.claimer?.email ?? c.claimer_account_id}</td>
+                <td style={{fontWeight:600}}>{c.shop?.name??c.shop_ref_id}</td>
+                <td style={{fontSize:12,color:"var(--text3)"}}>{c.claimer?.email??c.claimer_account_id}</td>
                 <td style={{fontSize:12}}>{c.contact_info}</td>
                 <td style={{fontSize:12,color:"var(--text3)"}}>{c.created_at?.substring(0,10)}</td>
                 <td>{statusBadge(c.status)}</td>
-                <td><button className="btn btn-outline btn-xs" onClick={()=>setSelected(c)}>จัดการ</button></td>
+                <td><button className="btn btn-outline btn-xs" onClick={()=>{ setSelected(c); setResolveForm({resolution:"NOTED",refund_amount:"",admin_note:""}); }}>จัดการ</button></td>
               </tr>
             ))}
           </tbody>
@@ -1207,7 +1043,7 @@ function ClaimsPage({ notify }) {
       {selected && (
         <Modal title={`เคลม #${selected.id}`} onClose={()=>setSelected(null)} wide>
           <div className="detail-row"><div className="detail-label">ร้านค้า</div><div className="detail-value">{selected.shop?.name}</div></div>
-          <div className="detail-row"><div className="detail-label">ผู้ร้องเรียน</div><div className="detail-value">{selected.claimer?.email ?? selected.claimer_account_id}</div></div>
+          <div className="detail-row"><div className="detail-label">ผู้ร้องเรียน</div><div className="detail-value">{selected.claimer?.email??selected.claimer_account_id}</div></div>
           <div className="detail-row">
             <div className="detail-label">ช่องทางติดต่อ</div>
             <div className="detail-value">
@@ -1216,10 +1052,12 @@ function ClaimsPage({ notify }) {
               </span>
             </div>
           </div>
-          <div className="detail-row"><div className="detail-label">รายละเอียด</div><div className="detail-value">{selected.detail}</div></div>
+          {/* reason ตรงกับ schema claim_requests.reason */}
+          <div className="detail-row"><div className="detail-label">รายละเอียด</div><div className="detail-value">{selected.reason}</div></div>
+          <div className="detail-row"><div className="detail-label">ประเภทการโกง</div><div className="detail-value">{selected.fraud_type?.name??"—"}</div></div>
           <div className="detail-row"><div className="detail-label">วันที่</div><div className="detail-value">{selected.created_at?.substring(0,10)}</div></div>
           <div className="detail-row"><div className="detail-label">สถานะ</div><div className="detail-value">{statusBadge(selected.status)}</div></div>
-          {(selected.attachments?.length > 0) && (
+          {selected.attachments?.length > 0 && (
             <div style={{marginTop:16,marginBottom:4}}>
               <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:10}}>หลักฐาน</div>
               <DocList docs={selected.attachments.map(makeDocFromAttachment)} onView={idx=>{ setViewerDocs(selected.attachments.map(makeDocFromAttachment)); setViewerInitIdx(idx); }} />
@@ -1231,25 +1069,48 @@ function ClaimsPage({ notify }) {
                 📞 ติดต่อผู้ร้องเรียนผ่าน: <strong>{selected.contact_info}</strong>
               </div>
               <div style={{display:"flex",justifyContent:"flex-end"}}>
-                <button className="btn btn-success btn-sm" onClick={()=>handleResolve(selected)} disabled={saving}>✓ ดำเนินการแล้ว / ปิดคำร้อง</button>
+                <button className="btn btn-success btn-sm" onClick={()=>setShowResolveModal(true)}>✓ ปิดคำร้อง / ดำเนินการแล้ว</button>
               </div>
             </div>
           )}
         </Modal>
       )}
+
+      {/* Modal ปิดเคลม — รับ resolution, refund_amount, admin_note */}
+      {showResolveModal && selected && (
+        <Modal title={`ปิดคำร้อง #${selected.id}`} onClose={()=>setShowResolveModal(false)}
+          footer={<><button className="btn btn-ghost btn-sm" onClick={()=>setShowResolveModal(false)}>ยกเลิก</button><button className="btn btn-success btn-sm" onClick={handleResolve} disabled={saving}>ยืนยันปิดคำร้อง</button></>}>
+          <div className="form-group">
+            <label className="form-label">ผลการดำเนินการ *</label>
+            <select className="input" value={resolveForm.resolution} onChange={e=>setResolveForm(p=>({...p,resolution:e.target.value}))}>
+              <option value="NOTED">NOTED — รับทราบ ไม่มีการคืนเงิน</option>
+              <option value="REFUNDED">REFUNDED — คืนเงินแล้ว</option>
+              <option value="REJECTED">REJECTED — ปฏิเสธคำร้อง</option>
+            </select>
+          </div>
+          {resolveForm.resolution==="REFUNDED" && (
+            <div className="form-group">
+              <label className="form-label">จำนวนเงินที่คืน (บาท)</label>
+              <input className="input" type="number" min="0" step="0.01" placeholder="0.00" value={resolveForm.refund_amount} onChange={e=>setResolveForm(p=>({...p,refund_amount:e.target.value}))} />
+            </div>
+          )}
+          <div className="form-group">
+            <label className="form-label">หมายเหตุแอดมิน</label>
+            <textarea className="input textarea" placeholder="บันทึกการดำเนินการ..." value={resolveForm.admin_note} onChange={e=>setResolveForm(p=>({...p,admin_note:e.target.value}))} rows={3} />
+          </div>
+        </Modal>
+      )}
+
       {viewerDocs && <DocViewer docs={viewerDocs} initialIndex={viewerInitIdx} onClose={()=>setViewerDocs(null)} />}
     </div>
   );
 }
 
-// ============================================================
-// APP SHELL
-// ============================================================
+// ── App Shell ─────────────────────────────────────────────────
 export default function AdminPanel() {
   const [activePage, setActivePage] = useState("dashboard");
   const [notification, setNotification] = useState(null);
 
-  // ตรวจสอบว่ามี token อยู่
   const token = localStorage.getItem("user_token");
   if (!token) {
     return (
@@ -1270,14 +1131,13 @@ export default function AdminPanel() {
 
   const renderPage = () => {
     switch(activePage) {
-      case "dashboard":         return <DashboardPage />;
-      case "shops":             return <ShopsPage notify={notify} />;
-      case "blacklist":         return <BlacklistPage />;
-      case "upgrade-tier3":     return <UpgradeTier3Page notify={notify} />;
-      case "upgrade-requests":  return <UpgradeRequestsPage notify={notify} />;
-      case "reports":           return <ReportsPage notify={notify} />;
-      case "claims":            return <ClaimsPage notify={notify} />;
-      default:                  return <DashboardPage />;
+      case "dashboard":        return <DashboardPage />;
+      case "shops":            return <ShopsPage notify={notify} />;
+      case "blacklist":        return <BlacklistPage />;
+      case "upgrade-tier3":    return <UpgradeTier3Page notify={notify} />;
+      case "upgrade-requests": return <UpgradeRequestsPage notify={notify} />;
+      case "claims":           return <ClaimsPage notify={notify} />;
+      default:                 return <DashboardPage />;
     }
   };
 
