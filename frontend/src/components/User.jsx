@@ -890,7 +890,7 @@ function ProfilePage({ user, onNavigate }) {
       .finally(() => setLoadingShop(false));
   }, []);
 
-  return (
+   return (
     <div className="page">
       <div className="section" style={{paddingTop:28}}>
 
@@ -941,7 +941,6 @@ function ProfilePage({ user, onNavigate }) {
     </div>
   );
 }
-
 // ── MyShopPage ────────────────────────────────────────────────
 function MyShopPage({ user, onNavigate, notify }) {
   const [shop, setShop]     = useState(null);
