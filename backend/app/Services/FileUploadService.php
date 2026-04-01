@@ -16,9 +16,31 @@ class FileUploadService
     /**
      * อัปโหลดเอกสาร KYC สำหรับ Upgrade Request
      */
+     * * @param UploadedFile $file
+     * @param string $shopRefId
+     * @return string (URL ของไฟล์)
+    */
     public function uploadKyc(UploadedFile $file, string $shopRefId): string
     {
-        return $this->upload($file, "kyc/{$shopRefId}");
+        // 1. สร้างชื่อไฟล์ใหม่ให้ไม่ซ้ำกัน (กันคนอัปโหลดชื่อไฟล์เดียวกันมาทับ)
+        $extension = $file->getClientOriginalExtension();
+        $filename = Str::uuid() . '.' . $extension;
+
+        // 2. กำหนด Path ที่จะเก็บใน S3 เช่น kyc_documents/SHOP-999/xxxx-xxxx.jpg
+        $path = "kyc_documents/{$shopRefId}";
+
+        // 3. ใช้ Storage facade บันทึกไฟล์ 
+        // สังเกตว่าเราไม่ต้องระบุ disk('s3') ถ้าใน .env เราตั้ง FILESYSTEM_DISK=s3 แล้ว
+        // ใส่ 'public' ถ้าต้องการให้ไฟล์นี้เปิดดูผ่าน URL ได้โดยตรง
+        $storedPath = Storage::putFileAs(
+            $path, 
+            $file, 
+            $filename, 
+            'public' 
+        );
+
+        // 4. คืนค่าเป็น Full URL ที่สามารถนำไปเปิดดู หรือเซฟลง Database ได้
+        return Storage::url($storedPath);
     }
 
     /**
