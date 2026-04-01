@@ -9,7 +9,26 @@ use App\Http\Controllers\Api\ClaimController;          // ลบ ReportControlle
 use App\Http\Controllers\Api\Admin\AdminShopController;
 use App\Http\Controllers\Api\Admin\AdminUpgradeController;
 use App\Http\Controllers\Api\Admin\AdminClaimController; // ลบ AdminReportController ออก
+use App\Http\Controllers\Api\Admin\AdminDashboardController;
+use Illuminate\Support\Facades\DB;
+Route::get('/test-speed', function () {
+    // 1. เช็คเวลาที่ Laravel ใช้ในการสตาร์ทตัวเอง (Boot Time)
+    $bootTime = microtime(true) - LARAVEL_START;
 
+    // 2. เช็คเวลาที่ใช้ในการ "เปิดการเชื่อมต่อและดึงข้อมูล 1 แถว"
+    $dbStart = microtime(true);
+    DB::table('shops')->first(); // ลองดึงร้านแรก
+    $dbTime = microtime(true) - $dbStart;
+
+    // 3. เวลารวมทั้งหมด
+    $totalTime = microtime(true) - LARAVEL_START;
+
+    return response()->json([
+        '1_boot_time_seconds' => round($bootTime, 4),
+        '2_db_connection_and_query_seconds' => round($dbTime, 4),
+        '3_total_time_seconds' => round($totalTime, 4)
+    ]);
+});
 Route::prefix('v1')->group(function () {
 
     // ── Public ───────────────────────────────────────────────────────────
@@ -44,7 +63,7 @@ Route::prefix('v1')->group(function () {
         Route::prefix('admin')
             ->middleware('is_admin')
             ->group(function () {
-
+Route::get('dashboard', [AdminDashboardController::class, 'index']);
                 Route::apiResource('shops', AdminShopController::class)
                     ->parameters(['shops' => 'ref_id']);
 

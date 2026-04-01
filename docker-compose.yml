@@ -3,6 +3,7 @@ version: '3.8'
 services:
   db:
     image: mysql:8.0
+    command: --skip-name-resolve  # 👈 เพิ่มบรรทัดนี้ลงไป!
     container_name: mysql_db
     restart: always
     environment:

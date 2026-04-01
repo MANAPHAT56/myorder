@@ -23,34 +23,30 @@ return new class extends Migration
         });
 
         // 3. accounts
-       Schema::create('accounts', function (Blueprint $table) {
-    // ปรับจาก 24 เป็น 26 เพื่อรองรับ ULID ของจริง
-    $table->string('id', 26)->primary(); 
-    
-    $table->unsignedInteger('role_id')->default(1);
-    $table->string('email', 255)->unique();
-    
-    // ตั้งชื่อให้สื่อสารง่าย หรือใช้ password ตามมาตรฐาน Laravel ก็ได้
-    $table->string('password_hash', 255)->nullable(); 
-    
-    // สำคัญมากสำหรับ Google Login
-    $table->string('google_id', 255)->nullable()->unique(); 
-    
-    $table->boolean('is_email_verified')->default(false);
-    $table->string('display_name', 255)->nullable();
-    $table->text('avatar_url')->nullable();
-    $table->string('phone_number', 20)->nullable();
-    $table->boolean('is_company')->default(false);
-    $table->boolean('is_active')->default(true);
-    $table->dateTime('last_login')->nullable();
-    $table->timestamps();
+        Schema::create('accounts', function (Blueprint $table) {
+            $table->string('id', 26)->primary(); // ULID 26
+            
+            $table->unsignedInteger('role_id')->default(1);
+            $table->string('email', 255)->unique();
+            $table->string('password_hash', 255)->nullable(); 
+            $table->string('google_id', 255)->nullable()->unique(); 
+            
+            $table->boolean('is_email_verified')->default(false);
+            $table->string('display_name', 255)->nullable();
+            $table->text('avatar_url')->nullable();
+            $table->string('phone_number', 20)->nullable();
+            $table->boolean('is_company')->default(false);
+            $table->boolean('is_active')->default(true);
+            $table->dateTime('last_login')->nullable();
+            $table->timestamps();
 
-    $table->foreign('role_id')->references('id')->on('roles')->restrictOnDelete();
-});
+            $table->foreign('role_id')->references('id')->on('roles')->restrictOnDelete();
+        });
+
         // 4. bookbanks
         Schema::create('bookbanks', function (Blueprint $table) {
             $table->increments('id');
-            $table->string('account_id', 24);
+            $table->string('account_id', 26); // แก้เป็น 26
             $table->string('bank_name', 50);
             $table->string('bank_branch_code', 10)->nullable();
             $table->string('bank_account_holder_name', 255);
@@ -71,23 +67,26 @@ return new class extends Migration
             $table->string('current_tier', 50)->default('TIER_1')->comment('ระดับขั้นปัจจุบันของร้านค้า');
             $table->boolean('is_active')->default(true)->comment('TRUE = เปิดอยู่, FALSE = ปิดร้านแล้ว');
             $table->integer('failed_upgrade_count')->default(0)->comment('นับจำนวนครั้งที่ขอเลื่อนขั้นแล้วถูกปฏิเสธ');
-            $table->boolean('is_blacklist')->default(false);
+            
+            // เพิ่ม ->index() ตรงนี้!
+            $table->boolean('is_blacklist')->default(false)->index();
+            
             $table->timestamps();
-            $table->softDeletes(); // สำหรับ deleted_at
+            $table->softDeletes();
 
             $table->foreign('owner_account_id')->references('id')->on('accounts')->cascadeOnDelete();
         });
 
         // 6. admin_action_logs
         Schema::create('admin_action_logs', function (Blueprint $table) {
-            $table->id(); // BIGINT AUTO_INCREMENT
-            $table->string('admin_id', 24)->comment('รหัสของแอดมินที่เป็นคนกดทำรายการ');
+            $table->id();
+            $table->string('admin_id', 26)->comment('รหัสของแอดมินที่เป็นคนกดทำรายการ'); // แก้เป็น 26
             $table->string('action_type', 50)->comment('ประเภทการกระทำ');
             $table->string('target_type', 50)->comment('ตารางที่ถูกกระทำ');
             $table->string('target_id', 50)->comment('ID ของเป้าหมาย');
             $table->json('details')->nullable()->comment('เก็บข้อมูลเพิ่มเติมแบบยืดหยุ่น');
             $table->string('ip_address', 45)->nullable()->comment('เก็บ IP ของแอดมิน');
-            $table->dateTime('created_at')->useCurrent(); // ไม่มี updated_at
+            $table->dateTime('created_at')->useCurrent();
 
             $table->index(['target_type', 'target_id']);
             $table->foreign('admin_id')->references('id')->on('accounts')->restrictOnDelete();
@@ -107,7 +106,7 @@ return new class extends Migration
         // 8. claim_requests
         Schema::create('claim_requests', function (Blueprint $table) {
             $table->increments('id');
-            $table->string('claimer_account_id', 24);
+            $table->string('claimer_account_id', 26); // แก้เป็น 26
             $table->string('shop_ref_id', 50);
             $table->unsignedInteger('fraud_type_id');
             $table->text('reason')->comment('รายละเอียดหรือเหตุผลที่โดนโกง');
@@ -124,10 +123,10 @@ return new class extends Migration
         Schema::create('blacklists', function (Blueprint $table) {
             $table->increments('id');
             $table->string('shop_ref_id', 50);
-            $table->string('admin_account_id', 24);
+            $table->string('admin_account_id', 26); // แก้เป็น 26
             $table->unsignedInteger('claim_request_id')->nullable()->comment('ใบเคลมฟางเส้นสุดท้าย');
             $table->text('reason');
-            $table->dateTime('created_at')->useCurrent(); // ไม่มี updated_at
+            $table->dateTime('created_at')->useCurrent();
 
             $table->foreign('shop_ref_id')->references('ref_id')->on('shops')->cascadeOnDelete();
             $table->foreign('admin_account_id')->references('id')->on('accounts')->restrictOnDelete();
@@ -140,7 +139,7 @@ return new class extends Migration
             $table->unsignedInteger('upgrade_request_id')->nullable();
             $table->unsignedInteger('claim_request_id')->nullable();
             $table->text('file_url');
-            $table->dateTime('created_at')->useCurrent(); // ไม่มี updated_at
+            $table->dateTime('created_at')->useCurrent();
 
             $table->foreign('upgrade_request_id')->references('id')->on('upgrade_requests')->cascadeOnDelete();
             $table->foreign('claim_request_id')->references('id')->on('claim_requests')->cascadeOnDelete();
