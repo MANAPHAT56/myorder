@@ -973,9 +973,33 @@ function MyShopPage({ user, onNavigate, notify }) {
     );
   }
 
- if (!user || (user.role!=="USER" && user.role!=="ADMIN")) return null;
+ if (!user || (user.role !== "USER" && user.role !== "ADMIN")) return null;
   if (loading) return <div className="page"><div className="section" style={{paddingTop:28}}><SkeletonGrid count={3} /></div></div>;
-  if (!shop) return <div className="page"><div className="section" style={{paddingTop:28}}><div className="alert alert-error">ไม่สามารถโหลดข้อมูลได้</div></div></div>;
+  
+  // กรณีที่โหลดเสร็จแล้วแต่ไม่พบข้อมูลร้านค้า (ไม่มีร้าน)
+  if (!shop) return (
+    <div className="page">
+      <div className="section" style={{ paddingTop: 28 }}>
+        <div className="card" style={{ textAlign: "center", padding: "60px 20px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+          <div style={{ fontSize: 64, marginBottom: 16 }}>🏪</div>
+          <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}>คุณยังไม่มีร้านค้าในระบบ</h2>
+          <div style={{ color: "var(--text3)", marginBottom: 24, lineHeight: "1.6" }}>
+            ดูเหมือนว่าบัญชีของคุณจะยังไม่ได้เปิดใช้งานระบบร้านค้า<br />
+            กรุณาติดต่อทีมงาน myOrder เพื่อลงทะเบียนและรับสิทธิ์ใช้งาน
+          </div>
+          <a 
+            href="https://line.me/myorder-register" /* เปลี่ยนเป็น Link ติดต่อแอดมินหรือ LINE OA ของคุณได้เลยครับ */
+            target="_blank" 
+            rel="noreferrer" 
+            className="btn btn-primary"
+            style={{ padding: "10px 24px", borderRadius: 100 }}
+          >
+            💬 ติดต่อ myOrder เพื่อลงทะเบียน
+          </a>
+        </div>
+      </div>
+    </div>
+  );
 
   const tier        = tierOf(shop);
   const failedCount = shop.failed_upgrade_count ?? 0;
