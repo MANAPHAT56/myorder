@@ -61,19 +61,24 @@ export default function MyShopPage({ user, notify }) {
   const failedCount = shop.failed_upgrade_count ?? 0;
   const upgradeHistory = shop.upgrade_requests ?? [];
 
-  const handleSave = async () => {
-    try {
-      const res = await api.updateMyShop(editForm);
-      // unwrap เหมือน useEffect — API อาจ return { data: {...} } หรือ object ตรงๆ
-      const updated = res.data ? res.data : res;
-      setShop(updated);
-      setEditForm({ name: updated.name, url: updated.url });
-      setEditing(false);
-      notify("บันทึกข้อมูลเรียบร้อย", "success");
-    } catch (e) {
-      notify("บันทึกไม่สำเร็จ: " + e.message, "error");
-    }
-  };
+const handleSave = async () => {
+  try {
+    const res = await api.updateMyShop(editForm);
+    // axios returns the body in res.data
+    // Laravel Resource wraps content in .data
+    const updated = res.data?.data || res.data || res; 
+    
+    setShop(updated);
+    // สำคัญ: ต้องใช้ค่าที่มาจาก server อัปเดตฟอร์มด้วย
+    setEditForm({ name: updated.name, url: updated.url }); 
+    setEditing(false);
+    notify("บันทึกข้อมูลเรียบร้อย", "success");
+  } catch (e) {
+    // ดึง error message จาก Laravel มาโชว์
+    const msg = e.response?.data?.message || e.message;
+    notify("บันทึกไม่สำเร็จ: " + msg, "error");
+  }
+};
 
   const statusBadge = (s) => {
     if (s === "pending") return <span className="badge badge-yellow">⏳ รอตรวจสอบ</span>;

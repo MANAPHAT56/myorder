@@ -3,11 +3,11 @@ const API_BASE = "http://localhost:8080/api/v1";
 export const authHeaders = () => {
   const t = localStorage.getItem("user_token");
   return {
+    "Content-Type": "application/json", // เพิ่มบรรทัดนี้เข้าไป
     Accept: "application/json",
     ...(t ? { Authorization: `Bearer ${t}` } : {}),
   };
 };
-
 export const handleResponse = async (response) => {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -79,7 +79,7 @@ const api = {
 
   updateMyShop: (data) =>
     fetch(`${API_BASE}/my-shop`, {
-      method: "PATCH",
+      method: "POST",
       headers: authHeaders(),
       credentials: "include",
       body: JSON.stringify(data),

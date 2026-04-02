@@ -54,7 +54,8 @@ Route::prefix('v1')->group(function () {
             ->middleware('ensure_shop_owner')
             ->group(function () {
                 Route::get  ('/',            [MyShopController::class, 'show']);
-                Route::patch('/',            [MyShopController::class, 'update']);
+               // เปลี่ยนบรรทัดนี้
+Route::post('/', [MyShopController::class, 'update']);
                 Route::get ('upgrade/check', [UpgradeController::class, 'check']);
                 Route::post('upgrade',       [UpgradeController::class, 'submit']);
             });
