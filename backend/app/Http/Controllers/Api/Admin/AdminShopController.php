@@ -10,7 +10,7 @@ use App\Models\Shop;
 use App\Models\Blacklist;
 use App\Services\ShopService;
 use Illuminate\Http\Request;
-
+use App\Models\AdminActionLog;
 /**
  * UC3:  เพิ่มร้านค้าใหม่
  * UC4:  แก้ไขข้อมูลร้านค้า
@@ -51,13 +51,41 @@ class AdminShopController extends Controller
     }
 
     /** UC4: PATCH /api/v1/admin/shops/{ref_id} */
+ /** UC4: PATCH /api/v1/admin/shops/{ref_id} */
     public function update(UpdateShopRequest $request, string $refId)
     {
         $shop = Shop::where('ref_id', $refId)->firstOrFail();
+        
+        // บันทึกข้อมูลก่อนอัปเดต (เพื่อเก็บ original state ถ้าต้องการ)
+        // $oldData = $shop->getOriginal();
+
+        // อัปเดตข้อมูล
         $shop->update($request->validated());
+
+        // ดึงเฉพาะข้อมูลที่มีการเปลี่ยนแปลงจริงๆ
+        $changes = $shop->getChanges();
+
+        // ตรวจสอบว่ามีการเปลี่ยนแปลงข้อมูลจริงๆ ค่อยเก็บ Log
+        if (!empty($changes)) {
+            // ไม่จำเป็นต้องเก็บ updated_at ลงไปใน details ให้รก log
+            unset($changes['updated_at']); 
+
+            \App\Models\AdminActionLog::create([
+                'admin_id'    => $request->user()->id,
+                'action_type' => 'UPDATE_SHOP',
+                'target_type' => 'shops',
+                'target_id'   => $shop->ref_id,
+                'details'     => [
+                    'shop_name'       => $shop->name,
+                    'updated_fields'  => $changes // เก็บว่าฟิลด์ไหนเปลี่ยนเป็นค่าอะไร
+                ],
+                'ip_address'  => $request->ip(),
+                'created_at'  => now(),
+            ]);
+        }
+
         return new ShopResource($shop->fresh());
     }
-
     /** UC5: DELETE /api/v1/admin/shops/{ref_id} */
     public function destroy(Request $request, string $refId)
 {
