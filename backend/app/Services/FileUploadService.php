@@ -15,33 +15,29 @@ class FileUploadService
 {
     /**
      * อัปโหลดเอกสาร KYC สำหรับ Upgrade Request
-     */
-     * * @param UploadedFile $file
+     * 
+     * @param UploadedFile $file
      * @param string $shopRefId
      * @return string (URL ของไฟล์)
-    */
-    public function uploadKyc(UploadedFile $file, string $shopRefId): string
-    {
-        // 1. สร้างชื่อไฟล์ใหม่ให้ไม่ซ้ำกัน (กันคนอัปโหลดชื่อไฟล์เดียวกันมาทับ)
-        $extension = $file->getClientOriginalExtension();
-        $filename = Str::uuid() . '.' . $extension;
+     */
+public function uploadKyc(UploadedFile $file, string $shopRefId): string
+{
+    $extension = $file->getClientOriginalExtension();
+    $filename = Str::uuid() . '.' . $extension;
+    $path = "kyc_documents/{$shopRefId}";
 
-        // 2. กำหนด Path ที่จะเก็บใน S3 เช่น kyc_documents/SHOP-999/xxxx-xxxx.jpg
-        $path = "kyc_documents/{$shopRefId}";
+    // ลองอัปโหลดไฟล์
+    $storedPath = Storage::putFileAs($path, $file, $filename, 'public');
 
-        // 3. ใช้ Storage facade บันทึกไฟล์ 
-        // สังเกตว่าเราไม่ต้องระบุ disk('s3') ถ้าใน .env เราตั้ง FILESYSTEM_DISK=s3 แล้ว
-        // ใส่ 'public' ถ้าต้องการให้ไฟล์นี้เปิดดูผ่าน URL ได้โดยตรง
-        $storedPath = Storage::putFileAs(
-            $path, 
-            $file, 
-            $filename, 
-            'public' 
-        );
-
-        // 4. คืนค่าเป็น Full URL ที่สามารถนำไปเปิดดู หรือเซฟลง Database ได้
-        return Storage::url($storedPath);
+    // 1. เพิ่มโค้ดเช็คว่าอัปโหลดสำเร็จไหม
+    if (!$storedPath) {
+        // ถ้าไม่สำเร็จ ให้โยน Error ออกมาตรงๆ จะได้รู้ว่าพังที่จุดนี้
+        throw new \Exception("อัปโหลดไฟล์ไป S3 ไม่สำเร็จ กรุณาตรวจสอบการตั้งค่า .env และ S3 Bucket");
     }
+
+    // 2. ถ้าสำเร็จ ค่อยส่ง URL กลับไป
+    return Storage::url($storedPath);
+}
 
     /**
      * อัปโหลดหลักฐานรายงาน

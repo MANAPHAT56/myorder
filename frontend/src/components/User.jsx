@@ -686,11 +686,11 @@ function ShopDetailPage({ shop: initialShop, user, onNavigate, notify }) {
   const [shop, setShop]         = useState(initialShop);
   const [shopLoading, setShopLoading] = useState(true);
   const refId = initialShop?.ref_id ?? initialShop?.id;
- useEffect(() => {
+
+  useEffect(() => {
     if (!refId) { setShopLoading(false); return; }
     api.getShopDetail(refId)
       .then(res => { 
-        // เช็คว่า API หุ้ม { data: ... } มาไหม ถ้าหุ้มก็ดึงไส้ในออกมา ถ้าไม่ก็ใช้ก้อนเดิม
         const actualShopData = res.data ? res.data : res;
         setShop(actualShopData); 
         setShopLoading(false); 
@@ -698,9 +698,7 @@ function ShopDetailPage({ shop: initialShop, user, onNavigate, notify }) {
       .catch(() => setShopLoading(false));
   }, [refId]);
 
-  // ลบ showReport ออก — ไม่มี /report endpoint แล้ว
   const [showClaim, setShowClaim] = useState(false);
-  // claim fields: fraud_type_id, reason (NOT NULL), contact_info
   const [claim, setClaim] = useState({ fraud_type_id:"", reason:"", contact_info:"" });
   const [claimAttachments, setClaimAttachments] = useState([{ id:Date.now(), file:null }]);
   const [sending, setSending] = useState(false);
@@ -717,7 +715,6 @@ function ShopDetailPage({ shop: initialShop, user, onNavigate, notify }) {
     setSending(true);
     try {
       const fd = new FormData();
-      // ส่งตรงตาม schema: fraud_type_id, reason, contact_info
       fd.append("fraud_type_id", claim.fraud_type_id);
       fd.append("reason", claim.reason);
       fd.append("contact_info", claim.contact_info);
@@ -734,7 +731,6 @@ function ShopDetailPage({ shop: initialShop, user, onNavigate, notify }) {
   if (shopLoading) return <div className="page"><div className="section" style={{paddingTop:24}}><SkeletonGrid count={1} /></div></div>;
   if (!shop) return null;
 
-  // ใช้ tierOf() ที่แก้แล้ว
   const tier        = tierOf(shop);
   const isClosed    = !shop.is_active;
   const isBlacklist = shop.is_blacklist;
@@ -743,7 +739,7 @@ function ShopDetailPage({ shop: initialShop, user, onNavigate, notify }) {
   const tierDesc = {
     1:"ร้านค้าทั่วไป ยังไม่ได้ยืนยันตัวตน",
     2:"ยืนยันตัวตนระดับเอกสาร",
-    3:"ยืนยันตัวตนสูงสุด มีประวัติการสั่งของจาก myOrder",
+    3:"ยืนยันตัวตนสูงสุด", // ลบคำว่า myOrder ออกแล้ว
   };
 
   return (
@@ -757,18 +753,18 @@ function ShopDetailPage({ shop: initialShop, user, onNavigate, notify }) {
             <div className="shop-detail-name">{shop.name}</div>
             <div className="shop-detail-meta">
               <TierBadge tier={tier} />
-              <span className="badge badge-gray">{shop.category??shop.channel}</span>
+              <span className="badge badge-gray">{shop.category ?? shop.channel ?? "ไม่ระบุ"}</span>
               <span className="badge" style={{background:shop.is_company?"#ede9fe":"#fce7f3",color:shop.is_company?"#6d28d9":"#be185d",border:`1px solid ${shop.is_company?"#c4b5fd":"#fbcfe8"}`}}>
                 {shop.is_company?"🏢 นิติบุคคล":"👤 บุคคลธรรมดา"}
               </span>
             </div>
-            <p className="shop-detail-desc">{shop.description}</p>
+            {/* ดักค่า description กรณี API ไม่ส่งมา */}
+            {shop.description && <p className="shop-detail-desc">{shop.description}</p>}
 
             <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:8}}>
-              {!isClosed && !isBlacklist && (
+              {!isClosed && !isBlacklist && (shop.url || shop.link) && (
                 <a href={shop.url??shop.link} className="btn btn-primary" target="_blank" rel="noreferrer">🔗 ติดต่อร้านค้า</a>
               )}
-              {/* ลบปุ่มรายงานออก — ไม่มี route /report แล้ว */}
               <button className="btn btn-outline" style={{borderColor:"var(--blue)",color:"var(--blue)"}} onClick={() => {
                 if (!canClaim) { notify("กรุณาเข้าสู่ระบบก่อนยื่นเรื่องเคลม","error"); return; }
                 setShowClaim(true);
@@ -801,8 +797,11 @@ function ShopDetailPage({ shop: initialShop, user, onNavigate, notify }) {
         </div>
 
         <div className="dash-card">
-          <div className="detail-row"><div className="detail-label">📍 ที่อยู่</div><div className="detail-value">{shop.location??"—"}</div></div>
-          <div className="detail-row"><div className="detail-label">👤 ประเภท</div><div className="detail-value">{shop.is_company?"นิติบุคคล":"บุคคลธรรมดา"}</div></div>
+          {/* เพิ่มฟิลด์ สร้างเมื่อ */}
+          <div className="detail-row"><div className="detail-label">📅 สร้างเมื่อ</div><div className="detail-value">{shop.created_at ?? "—"}</div></div>
+          {/* ดักค่า location เป็น — ถ้าไม่มีข้อมูล */}
+          <div className="detail-row"><div className="detail-label">📍 ที่อยู่</div><div className="detail-value">{shop.location ?? "—"}</div></div>
+          <div className="detail-row"><div className="detail-label">👤 ประเภท</div><div className="detail-value">{shop.is_company ? "นิติบุคคล" : "บุคคลธรรมดา"}</div></div>
           <div className="detail-row">
             <div className="detail-label">🏷️ สถานะ</div>
             <div className="detail-value">
@@ -811,8 +810,16 @@ function ShopDetailPage({ shop: initialShop, user, onNavigate, notify }) {
                 : <span className="badge badge-green">✓ เปิดให้บริการ</span>}
             </div>
           </div>
-          {!isClosed && !isBlacklist && (
-            <div className="detail-row"><div className="detail-label">🔗 ลิงก์</div><div className="detail-value"><a href={shop.url??shop.link} style={{color:"var(--accent)"}} target="_blank" rel="noreferrer">{shop.url??shop.link}</a></div></div>
+          {/* แสดงข้อมูลลิงก์ให้ถูกต้อง */}
+          {!isClosed && !isBlacklist && (shop.url || shop.link) && (
+            <div className="detail-row">
+              <div className="detail-label">🔗 ลิงก์</div>
+              <div className="detail-value">
+                <a href={shop.url ?? shop.link} style={{color:"var(--accent)"}} target="_blank" rel="noreferrer">
+                  {shop.url ?? shop.link}
+                </a>
+              </div>
+            </div>
           )}
           {failedCount > 0 && (
             <div className="detail-row">
@@ -826,7 +833,6 @@ function ShopDetailPage({ shop: initialShop, user, onNavigate, notify }) {
         </div>
       </div>
 
-      {/* Modal เคลม — ส่ง fraud_type_id, reason, contact_info ตรงกับ schema */}
       {showClaim && (
         <Modal title="⚖️ เคลมปัญหากับร้านค้า" onClose={() => { setShowClaim(false); resetClaim(); }} wide
           footer={<>
@@ -848,12 +854,10 @@ function ShopDetailPage({ shop: initialShop, user, onNavigate, notify }) {
             </select>
           </div>
           <div className="form-group">
-            {/* ส่ง field "reason" ตรงกับ claim_requests.reason (NOT NULL) */}
             <label className="form-label">รายละเอียดปัญหา *</label>
             <textarea className="input textarea" placeholder="อธิบายปัญหาที่ต้องการเคลม..." value={claim.reason} onChange={e=>setClaim(p=>({...p,reason:e.target.value}))} />
           </div>
           <div className="form-group">
-            {/* ส่ง field "contact_info" ตรงกับ claim_requests.contact_info */}
             <label className="form-label">ช่องทางติดต่อกลับ *</label>
             <input className="input" placeholder="เช่น LINE: @yourlineid หรือ 081-234-5678" value={claim.contact_info} onChange={e=>setClaim(p=>({...p,contact_info:e.target.value}))} />
           </div>
@@ -880,7 +884,6 @@ function ShopDetailPage({ shop: initialShop, user, onNavigate, notify }) {
     </div>
   );
 }
-
 function ProfilePage({ user, onNavigate }) {
   const [hasShop, setHasShop] = useState(false);
   const [loadingShop, setLoadingShop] = useState(true);
@@ -950,16 +953,14 @@ function MyShopPage({ user, onNavigate, notify }) {
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
 
-  useEffect(() => {
-    if (!user ) { setLoading(false); return; }
-    api.getMyShop()
-      .then(data => {
-        setShop(data);
-        setEditForm({ name:data.name, url:data.url });
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, [user]);
+api.getMyShop()
+  .then(res => {
+    const data = res.data ? res.data : res;  // unwrap เหมือน ShopDetail
+    setShop(data);
+    setEditForm({ name: data.name, url: data.url });
+    setLoading(false);
+  })
+  .catch(() => setLoading(false));
 
   if (user && user.role==="USER" && !shop && !loading) {
     return (
