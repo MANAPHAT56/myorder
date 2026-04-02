@@ -32,11 +32,21 @@ class MyShopController extends Controller
      * UC1: แก้ไขชื่อ, ลิงก์, รายละเอียดร้าน
      * PATCH /api/v1/my-shop
      */
-    public function update(UpdateShopRequest $request)
-    {
-        $shop = $request->user()->shop;
-        $shop->update($request->validated());
-
-        return new ShopResource($shop->fresh());
+   public function update(UpdateShopRequest $request)
+{
+    $user = $request->user();
+    
+    // ลองเช็ค Manual ว่า Query เจอไหม
+    $shop = \App\Models\Shop::where('owner_account_id', $user->id)->first();
+    
+    if (!$shop) {
+        return response()->json([
+            'error' => 'Shop not found',
+            'debug_user_id' => $user->id
+        ], 404);
     }
+
+    $shop->update($request->validated());
+    return new ShopResource($shop->fresh());
+}
 }
