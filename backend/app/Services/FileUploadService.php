@@ -15,35 +15,25 @@ class FileUploadService
 {
     /**
      * อัปโหลดเอกสาร KYC สำหรับ Upgrade Request
-     * 
-     * @param UploadedFile $file
+     * * @param UploadedFile $file
      * @param string $shopRefId
      * @return string (URL ของไฟล์)
      */
-public function uploadKyc(UploadedFile $file, string $shopRefId): string
-{
-    $extension = $file->getClientOriginalExtension();
-    $filename = Str::uuid() . '.' . $extension;
-    $path = "kyc_documents/{$shopRefId}";
-
-    // ลองอัปโหลดไฟล์
-    $storedPath = Storage::putFileAs($path, $file, $filename, 'public');
-
-    // 1. เพิ่มโค้ดเช็คว่าอัปโหลดสำเร็จไหม
-    if (!$storedPath) {
-        // ถ้าไม่สำเร็จ ให้โยน Error ออกมาตรงๆ จะได้รู้ว่าพังที่จุดนี้
-        throw new \Exception("อัปโหลดไฟล์ไป S3 ไม่สำเร็จ กรุณาตรวจสอบการตั้งค่า .env และ S3 Bucket");
+    public function uploadKyc(UploadedFile $file, string $shopRefId): string
+    {
+        // 1. เรียกใช้ฟังก์ชันแกนกลาง อัปโหลดเข้า S3 แบบ Private
+        $path = $this->upload($file, "kyc_documents/{$shopRefId}");
+        
+        // 2. คืนค่ากลับไปเป็น Signed URL (มีอายุ 15 นาที) เพื่อให้ Frontend นำไปแสดงผลได้
+        return $this->getUrl($path);
     }
-
-    // 2. ถ้าสำเร็จ ค่อยส่ง URL กลับไป
-    return Storage::url($storedPath);
-}
 
     /**
      * อัปโหลดหลักฐานรายงาน
      */
     public function uploadReport(UploadedFile $file, int $reportId): string
     {
+        // คืนค่าเป็น Path เอาไปเซฟลง Database
         return $this->upload($file, "reports/{$reportId}");
     }
 
@@ -52,23 +42,30 @@ public function uploadKyc(UploadedFile $file, string $shopRefId): string
      */
     public function uploadClaim(UploadedFile $file, int $claimId): string
     {
+        // คืนค่าเป็น Path เอาไปเซฟลง Database
         return $this->upload($file, "claims/{$claimId}");
     }
 
     /**
-     * core upload — คืน path ที่เก็บใน DB
-     * path จะเป็น "kyc/SHOP001/abc123.jpg" เป็นต้น
+     * --------------------------------------------------
+     * CORE UPLOAD (ฟังก์ชันแกนกลาง)
+     * --------------------------------------------------
+     * คืนค่า path ที่เก็บใน DB เช่น "claims/1/abc123.jpg"
      */
-    private function upload(UploadedFile $file, string $folder): string
+    private function upload(UploadedFile $file, string $folder, string $visibility = 'private'): string
     {
         $ext      = $file->getClientOriginalExtension();
         $filename = Str::uuid() . '.' . $ext;
-        $path     = "{$folder}/{$filename}";
 
-        Storage::disk(config('filesystems.default'))
-            ->put($path, file_get_contents($file), 'private');
+        // ใช้ putFileAs แทน file_get_contents() จะช่วยเซฟ RAM ไม่ให้เซิร์ฟเวอร์โหลดหนักเวลาเจอไฟล์คลิปวิดีโอใหญ่ๆ
+        $storedPath = Storage::putFileAs($folder, $file, $filename, $visibility);
 
-        return $path;
+        // ดัก Error ถ้าระบบอัปโหลดเข้า S3 ไม่สำเร็จ
+        if (!$storedPath) {
+            throw new \Exception("อัปโหลดไฟล์ไป S3 ไม่สำเร็จ (Folder: {$folder}) กรุณาตรวจสอบการตั้งค่า AWS ในไฟล์ .env");
+        }
+
+        return $storedPath;
     }
 
     /**

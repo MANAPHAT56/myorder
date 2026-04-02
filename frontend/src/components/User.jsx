@@ -64,18 +64,19 @@ const api = {
     }).then(handleResponse),
 
   // UC18: ยื่นเคลม — ใช้ FormData
-  claimShop: (refId, formData) =>
-    fetch(`${API_BASE}/shops/${refId}/claim`, {
-      method: "POST",
-      headers: {
-        // ❌ ไม่ต้องตั้ง Content-Type เมื่อใช้ FormData
-        ...(localStorage.getItem("user_token") && { 
-          Authorization: `Bearer ${localStorage.getItem("user_token")}` 
-        })
-      },
-      credentials: "include",
-      body: formData, // FormData จะ set Content-Type อัตโนมัติ
-    }).then(handleResponse),
+claimShop: (refId, formData) =>
+  fetch(`${API_BASE}/shops/${refId}/claim`, {
+    method: "POST",
+    headers: {
+      "Accept": "application/json",  // ← ต้องมี ไม่งั้น Laravel redirect 302
+      ...(localStorage.getItem("user_token") && {
+        Authorization: `Bearer ${localStorage.getItem("user_token")}`
+      })
+      // ❌ ไม่ต้องใส่ Content-Type — FormData จัดการเองอัตโนมัติ
+    },
+    credentials: "include",
+    body: formData,
+  }).then(handleResponse),
 
   getMyShop: () =>
     fetch(`${API_BASE}/my-shop`, { 
