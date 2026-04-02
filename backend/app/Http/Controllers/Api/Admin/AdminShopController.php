@@ -145,12 +145,29 @@ class AdminShopController extends Controller
      * UC9: เลื่อนขั้น 3 (admin ทดลองสั่งของแล้ว)
      * PATCH /api/v1/admin/shops/{ref_id}/tier3
      */
-    public function promoteTier3(Request $request, string $refId)
+   public function promoteTier3(Request $request, string $refId)
     {
         $shop = Shop::where('ref_id', $refId)
-    ->where('current_tier', 'TIER_2') // ← ชื่อจริงใน schema
-    ->firstOrFail();
-$shop->update(['current_tier' => 'TIER_3']);
+            ->where('current_tier', 'TIER_2') // ← ชื่อจริงใน schema
+            ->firstOrFail();
+            
+        $shop->update(['current_tier' => 'TIER_3']);
+
+        // บันทึก Action Log สำหรับการเลื่อนขั้น
+        AdminActionLog::create([
+            'admin_id'    => $request->user()->id,
+            'action_type' => 'PROMOTE_SHOP_TIER', // ใช้ชื่อ Action ที่สื่อความหมายชัดเจน
+            'target_type' => 'shops',
+            'target_id'   => $shop->ref_id,
+            'details'     => [
+                'shop_name'     => $shop->name,
+                'previous_tier' => 'TIER_2',
+                'new_tier'      => 'TIER_3'
+            ],
+            'ip_address'  => $request->ip(),
+            'created_at'  => now(),
+        ]);
+
         return response()->json(['message' => "เลื่อน \"{$shop->name}\" เป็นขั้น 3 เรียบร้อย"]);
     }
 }

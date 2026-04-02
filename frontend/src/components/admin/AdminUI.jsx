@@ -21,14 +21,23 @@ export function validateUserId(val) {
 
 // ── Helpers ──────────────────────────────────────────────────
 export function makeDocFromAttachment(att) {
-  const url = att.file_url ?? att.url ?? "";
-  const isPdf = url.toLowerCase().endsWith(".pdf");
+  const fullUrl = att.file_url ?? att.url ?? "";
+  
+  // 1. ตัด Query String (หลังเครื่องหมาย ?) ออกก่อน
+  const urlWithoutQuery = fullUrl.split("?")[0];
+  
+  // 2. ค่อยดึงเฉพาะชื่อไฟล์ออกมา (เช่น document.pdf หรือ image.jpg)
+  const fileName = urlWithoutQuery.split("/").pop() || "unknown-file";
+  
+  // 3. เช็คว่าเป็น PDF ไหมจากชื่อไฟล์ที่สะอาดแล้ว
+  const isPdf = fileName.toLowerCase().endsWith(".pdf");
+
   return {
     id: att.id,
-    name: url.split("/").pop(),
-    label: att.label ?? url.split("/").pop(),
+    name: fileName, // ชื่อไฟล์สั้นๆ สวยๆ
+    label: att.label ?? fileName,
     fileType: isPdf ? "pdf" : "image",
-    previewUrl: isPdf ? null : url,
+    previewUrl: isPdf ? null : fullUrl, // ใช้ fullUrl (ที่มี S3 Token) สำหรับดูรูป
   };
 }
 

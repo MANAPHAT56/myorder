@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\ClaimRequest;
 use Illuminate\Http\Request;
-
+use App\Models\AdminActionLog;
 /**
  * UC11: จัดการคำร้องเคลม
  */
