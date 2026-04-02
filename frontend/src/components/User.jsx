@@ -485,7 +485,34 @@ function SkeletonGrid({ count = 8 }) {
 }
 
 
+// ── Avatar Component — ใช้แทนทุกที่ ──────────────────────────
+function UserAvatar({ user, size = 72, fontSize = 28 }) {
+  const [imgError, setImgError] = useState(false);
+  const picture = user?.picture ?? user?.avatar ?? user?.profile_image;
 
+  const fallback = user?.role === "admin" ? "🔑"
+    : user?.role === "shop" ? "🏪" : "👤";
+
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: "50%",
+      background: "var(--accent-light)", border: "3px solid var(--border)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontSize: picture && !imgError ? 0 : fontSize,
+      flexShrink: 0, overflow: "hidden",
+    }}>
+      {picture && !imgError ? (
+        <img
+          src={picture}
+          alt="profile"
+          referrerPolicy="no-referrer"   // ← แก้ 429 จาก Google
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          onError={() => setImgError(true)}
+        />
+      ) : fallback}
+    </div>
+  );
+}
 // 👇 เพิ่ม onLoginClick เข้ามาในวงเล็บ
 function Navbar({ user, onNavigate, darkMode, toggleDark, currentPage, onLoginClick }) {
 
@@ -499,10 +526,17 @@ function Navbar({ user, onNavigate, darkMode, toggleDark, currentPage, onLoginCl
       </div>
       <div className="nav-right">
         {user && (
-          <button className="btn btn-ghost btn-sm" onClick={() => onNavigate("profile")}>
-            {user.role==="admin"?"🔑":user.role==="shop"?"🏪":"👤"} {user.name?.split(" ")[0]}
-          </button>
-        )}
+  <button className="btn btn-ghost btn-sm" onClick={() => onNavigate("profile")} 
+    style={{display:"flex", alignItems:"center", gap:8}}>
+    {user.picture || user.avatar ? (
+      <img src={user.picture ?? user.avatar} alt="profile"
+        style={{width:26, height:26, borderRadius:"50%", objectFit:"cover"}} />
+    ) : (
+      <UserAvatar user={user} size={28} fontSize={14} />
+    )}
+    {user.name?.split(" ")[0]}
+  </button>
+)}
         {(!user || user.role!=="admin") && (
           <button className="btn btn-outline btn-sm" onClick={() => onNavigate("myshop")}>🏪 ร้านของฉัน</button>
         )}
@@ -901,9 +935,8 @@ function ProfilePage({ user, onNavigate }) {
 
         {/* Profile Header จากอันที่ 2 */}
         <div className="profile-header">
-          <div className="avatar">
-            {user.role==="shop" ? "🏪" : user.role==="admin" ? "🔑" : "👤"}
-          </div>
+    <UserAvatar user={user} size={72} fontSize={28} />
+ 
           <div style={{flex:1}}>
             <div className="profile-name">{user.name ?? user.display_name}</div>
             <div className="profile-email">{user.email}</div>
