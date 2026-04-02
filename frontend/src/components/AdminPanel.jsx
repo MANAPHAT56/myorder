@@ -974,6 +974,7 @@ function ClaimsPage({ notify }) {
   const [saving, setSaving]    = useState(false);
   const [viewerDocs, setViewerDocs]     = useState(null);
   const [viewerInitIdx, setViewerInitIdx] = useState(0);
+  
   // modal ปิดเคลม
   const [showResolveModal, setShowResolveModal] = useState(false);
   const [resolveForm, setResolveForm] = useState({ resolution:"NOTED", refund_amount:"", admin_note:"" });
@@ -984,6 +985,7 @@ function ClaimsPage({ notify }) {
       .then(data => { setClaims(data.data??[]); setTotalPages(data.last_page??1); setLoading(false); })
       .catch(() => setLoading(false));
   };
+
   useEffect(() => { load(); }, []);
 
   const handleResolve = async () => {
@@ -995,11 +997,30 @@ function ClaimsPage({ notify }) {
         resolveForm.refund_amount ? parseFloat(resolveForm.refund_amount) : null,
         resolveForm.admin_note,
       );
-      setClaims(prev => prev.filter(c => c.id!==selected.id));
+      setClaims(prev => prev.filter(c => c.id !== selected.id));
       setSelected(null); setShowResolveModal(false);
-      notify(`ปิดคำร้องเคลม #${selected.id} เรียบร้อย`,"success");
-    } catch(e) { notify("ไม่สำเร็จ: "+e.message,"error"); }
+      notify(`ปิดคำร้องเคลม #${selected.id} เรียบร้อย`, "success");
+    } catch(e) { notify("ไม่สำเร็จ: "+e.message, "error"); }
     finally { setSaving(false); }
+  };
+
+  // ส่วนที่เพิ่มใหม่: ฟังก์ชันสำหรับ Blacklist ร้านค้า (เชื่อมต่อ API จริง)
+  const handleBlacklist = async (clm) => {
+    const reason = window.prompt(`ระบุเหตุผลในการแบล็คลิสต์ร้านค้า "${clm.shop?.name}":`, "ทำผิดกฎระเบียบ/ฉ้อโกง");
+    if (reason) {
+      setSaving(true);
+      try {
+        await adminApi.blacklistShop(clm.shop_ref_id, reason, clm.id);
+        notify(`เพิ่มร้าน "${clm.shop?.name}" ลงในบัญชีดำเรียบร้อยแล้ว`, "error");
+        // หลังจากแบล็คลิสต์ อาจจะปิด Modal หรือ Refresh ข้อมูล
+        setSelected(null);
+        load(); 
+      } catch(e) {
+        notify("แบล็คลิสต์ไม่สำเร็จ: " + e.message, "error");
+      } finally {
+        setSaving(false);
+      }
+    }
   };
 
   const statusBadge = (s) => s==="pending"
@@ -1010,6 +1031,7 @@ function ClaimsPage({ notify }) {
     <div>
       <div className="page-title">⚖️ คำร้องขอเคลม</div>
       <div className="page-sub">UC11 — ติดตามและช่วยเหลือผู้ใช้ที่ประสบปัญหา</div>
+      
       <div style={{display:"flex",gap:8,marginBottom:20}}>
         {["pending","resolved"].map(s => (
           <button key={s} className={`btn btn-sm ${statusFilter===s?"btn-primary":"btn-outline"}`}
@@ -1018,6 +1040,7 @@ function ClaimsPage({ notify }) {
           </button>
         ))}
       </div>
+
       <div className="card" style={{padding:0,overflow:"hidden"}}>
         <table className="table">
           <thead><tr><th>รหัส</th><th>ร้านค้า</th><th>ผู้ร้องเรียน</th><th>ช่องทางติดต่อ</th><th>วันที่</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
@@ -1052,31 +1075,47 @@ function ClaimsPage({ notify }) {
               </span>
             </div>
           </div>
-          {/* reason ตรงกับ schema claim_requests.reason */}
           <div className="detail-row"><div className="detail-label">รายละเอียด</div><div className="detail-value">{selected.reason}</div></div>
           <div className="detail-row"><div className="detail-label">ประเภทการโกง</div><div className="detail-value">{selected.fraud_type?.name??"—"}</div></div>
           <div className="detail-row"><div className="detail-label">วันที่</div><div className="detail-value">{selected.created_at?.substring(0,10)}</div></div>
           <div className="detail-row"><div className="detail-label">สถานะ</div><div className="detail-value">{statusBadge(selected.status)}</div></div>
+
           {selected.attachments?.length > 0 && (
             <div style={{marginTop:16,marginBottom:4}}>
               <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:10}}>หลักฐาน</div>
               <DocList docs={selected.attachments.map(makeDocFromAttachment)} onView={idx=>{ setViewerDocs(selected.attachments.map(makeDocFromAttachment)); setViewerInitIdx(idx); }} />
             </div>
           )}
+
+          <hr style={{ margin: "20px 0", border: 0, borderTop: "1px solid var(--border)" }} />
+
           {selected.status==="pending" && (
-            <div>
-              <div className="alert alert-info" style={{marginTop:12,marginBottom:12}}>
-                📞 ติดต่อผู้ร้องเรียนผ่าน: <strong>{selected.contact_info}</strong>
-              </div>
-              <div style={{display:"flex",justifyContent:"flex-end"}}>
-                <button className="btn btn-success btn-sm" onClick={()=>setShowResolveModal(true)}>✓ ปิดคำร้อง / ดำเนินการแล้ว</button>
-              </div>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems: "center", gap: 8 }}>
+               {/* ปุ่ม Blacklist ที่เพิ่มเข้ามาเหมือนตัวอย่างแรก */}
+               <button 
+                className="btn btn-error btn-sm" 
+                style={{ background: "#ff4d4f", color: "white" }} 
+                onClick={() => handleBlacklist(selected)}
+                disabled={saving}
+              >
+                🚫 แบล็คลิสต์ร้านค้า
+              </button>
+
+              <button className="btn btn-success btn-sm" onClick={()=>setShowResolveModal(true)} disabled={saving}>
+                ✓ ปิดคำร้อง / ดำเนินการแล้ว
+              </button>
+            </div>
+          )}
+
+          {selected.status==="pending" && (
+            <div className="alert alert-info" style={{marginTop:12}}>
+              📞 ติดต่อผู้ร้องเรียนผ่าน: <strong>{selected.contact_info}</strong>
             </div>
           )}
         </Modal>
       )}
 
-      {/* Modal ปิดเคลม — รับ resolution, refund_amount, admin_note */}
+      {/* Modal ปิดเคลม */}
       {showResolveModal && selected && (
         <Modal title={`ปิดคำร้อง #${selected.id}`} onClose={()=>setShowResolveModal(false)}
           footer={<><button className="btn btn-ghost btn-sm" onClick={()=>setShowResolveModal(false)}>ยกเลิก</button><button className="btn btn-success btn-sm" onClick={handleResolve} disabled={saving}>ยืนยันปิดคำร้อง</button></>}>
