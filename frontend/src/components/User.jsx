@@ -681,15 +681,20 @@ function UpgradeCooldownBanner({ shopRefId }) {
 }
 
 // ── ShopDetailPage ───────────────────────────────────────────
+// ── ShopDetailPage ───────────────────────────────────────────
 function ShopDetailPage({ shop: initialShop, user, onNavigate, notify }) {
   const [shop, setShop]         = useState(initialShop);
   const [shopLoading, setShopLoading] = useState(true);
   const refId = initialShop?.ref_id ?? initialShop?.id;
-
-  useEffect(() => {
+ useEffect(() => {
     if (!refId) { setShopLoading(false); return; }
     api.getShopDetail(refId)
-      .then(data => { setShop(data); setShopLoading(false); })
+      .then(res => { 
+        // เช็คว่า API หุ้ม { data: ... } มาไหม ถ้าหุ้มก็ดึงไส้ในออกมา ถ้าไม่ก็ใช้ก้อนเดิม
+        const actualShopData = res.data ? res.data : res;
+        setShop(actualShopData); 
+        setShopLoading(false); 
+      })
       .catch(() => setShopLoading(false));
   }, [refId]);
 
@@ -732,10 +737,9 @@ function ShopDetailPage({ shop: initialShop, user, onNavigate, notify }) {
   // ใช้ tierOf() ที่แก้แล้ว
   const tier        = tierOf(shop);
   const isClosed    = !shop.is_active;
-  const isBlacklist = !!shop.is_blacklist;
+  const isBlacklist = shop.is_blacklist;
   const failedCount = shop.failed_upgrade_count ?? 0;
   const shopRefId   = shop.ref_id ?? shop.id;
-
   const tierDesc = {
     1:"ร้านค้าทั่วไป ยังไม่ได้ยืนยันตัวตน",
     2:"ยืนยันตัวตนระดับเอกสาร",
@@ -878,12 +882,10 @@ function ShopDetailPage({ shop: initialShop, user, onNavigate, notify }) {
 }
 
 function ProfilePage({ user, onNavigate }) {
-  const [hasShop, setHasShop]       = useState(user.role === "shop"); // default จาก token ก่อน
-  const [loadingShop, setLoadingShop] = useState(user.role === "shop"); // โหลดเฉพาะถ้า role=shop
+  const [hasShop, setHasShop] = useState(false);
+  const [loadingShop, setLoadingShop] = useState(true);
 
   useEffect(() => {
-    // ตรวจจาก API จริงเฉพาะเมื่อ role เป็น shop
-    if (user.role !== "shop") { setLoadingShop(false); return; }
     api.getMyShop()
       .then(() => setHasShop(true))
       .catch(() => setHasShop(false))
@@ -1096,7 +1098,6 @@ function MyShopPage({ user, onNavigate, notify }) {
     </div>
   );
 }
-
 // ── UpgradePage ───────────────────────────────────────────────
 const WIZARD_STEPS = ["ตรวจสอบ","อัปโหลด","ยืนยัน"];
 
